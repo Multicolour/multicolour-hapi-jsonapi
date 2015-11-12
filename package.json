@@ -1,0 +1,39 @@
+{
+  "name": "multicolour-hapi-jsonapi",
+  "version": "0.1.0",
+  "description": "JSON API reply decorator built on Waterline and waterline-jsonapi",
+  "main": "index.js",
+  "scripts": {
+    "test": "tape tests/*.js | tap-spec"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Multicolour/multicolour-hapi-jsonapi.git"
+  },
+  "keywords": [
+    "jsonapi",
+    "multicolour",
+    "hapijs",
+    "waterline"
+  ],
+  "author": "newworldcode <hello@newworld.codes> (https://newworld.codes)",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/Multicolour/multicolour-hapi-jsonapi/issues"
+  },
+  "homepage": "https://github.com/Multicolour/multicolour-hapi-jsonapi#readme",
+  "engine-strict": true,
+  "engineStrict": true,
+  "engines": {
+    "node": ">= 4.0.0"
+  },
+  "devDependencies": {
+    "eslint": "^1.5.1",
+    "istanbul": "^0.3.22",
+    "tap-spec": "^4.1.0",
+    "tape": "^4.2.0"
+  },
+  "dependencies": {
+    "multicolour": "^0.1.3"
+  }
+}
