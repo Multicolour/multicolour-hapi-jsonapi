@@ -14,10 +14,7 @@ const service = new Multicolour({
     },
     connections: {
       development: {
-        adapter: "development",
-        host: "localhost",
-        port: 27017,
-        database: "multicolour"
+        adapter: "development"
       }
     }
   }
