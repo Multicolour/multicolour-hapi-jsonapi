@@ -21,25 +21,27 @@ function clone_attributes(attributes) {
  * @return {Object} Fixed object.
  */
 function check_and_fix_associations(attributes, type) {
+  const model = clone_attributes(attributes)
+
   // If it's a string, remove erroneous keys.
   if (type === "string") {
-    delete attributes.id
-    delete attributes.createdAt
-    delete attributes.updatedAt
+    delete model.id
+    delete model.createdAt
+    delete model.updatedAt
   }
 
   // Loop over the attributes to see if we have
   // any relationship type fields to add validation for.
-  for (const attribute in attributes) {
-    if (attributes[attribute].hasOwnProperty("model")) {
-      attributes[attribute] = type
+  for (const attribute in model) {
+    if (model[attribute].hasOwnProperty("model")) {
+      model[attribute] = type
     }
-    else if (attributes[attribute].hasOwnProperty("collection")) {
-      attributes[attribute] = type === "object" ? "array" : type
+    else if (model[attribute].hasOwnProperty("collection")) {
+      model[attribute] = type === "object" ? "array" : type
     }
   }
 
-  return attributes
+  return model
 }
 
 class Multicolour_Hapi_JSONAPI extends Map {
