@@ -70,17 +70,36 @@ class Multicolour_Hapi_JSONAPI extends Map {
     // Clone the attributes.
     const attributes = clone_attributes(collection._attributes)
 
-    // Generate a Joi schema from a fixed version of the attributes.
-    const payload = waterline_joi(check_and_fix_associations(attributes, "object"))
+    // Get the model since we're going to rid of the `id` attribute.
+    const model = check_and_fix_associations(attributes, "object")
+    delete model.id
 
+    // Generate a Joi schema from a fixed version of the attributes.
+    const payload = waterline_joi(model)
+
+    // Generate the `data` payload schema.
+    const data_payload = joi.object({
+      id: joi.string().required(),
+      type: joi.string().required(),
+      attributes: payload,
+      relationships: joi.object()
+    })
+
+    // This is an `alternatives` because entities may,
+    // or may not be a singular and there might have
+    // been an error.
     return joi.alternatives().try(
       joi.object({
-        data: joi.alternatives().try(joi.array().items(payload), payload),
+        data: joi.alternatives().try(
+          joi.array().items(data_payload),
+          data_payload
+        ),
         links: joi.object({
-          self: joi.string(),
-          last: joi.string(),
-          next: joi.string()
-        })
+          self: joi.string().uri(),
+          last: joi.string().uri(),
+          next: joi.string().uri()
+        }),
+        included: joi.array()
       }),
       joi.object({
         errors: joi.alternatives().try(joi.array(), joi.object())
