@@ -104,7 +104,7 @@ class Multicolour_Hapi_JSONAPI extends Map {
         included: joi.array()
       }),
       joi.object({
-        errors: joi.alternatives().try(joi.array(), joi.object())
+        errors: joi.alternatives().try(joi.array().items(joi.object()), joi.object())
       })
     )
   }
@@ -173,6 +173,29 @@ class Multicolour_Hapi_JSONAPI extends Map {
 
     // Decorate the reply.
     server.decorate("reply", name, this.generate_payload)
+
+    // Listen for replies so we can transform any boom
+    // responses to be JSON API compliant.
+    server.ext("onPreResponse", (request, reply) => {
+      //  Get the response.
+      const response = request.response
+
+      // Check it's a boom response
+      // and exit if it isn't.
+      if (!response.isBoom) {
+        return reply.continue()
+      }
+
+      response.output.payload = {
+        errors: {
+          title: response.output.payload.error,
+          status: response.output.statusCode,
+          detail: response.output.payload.message
+        }
+      }
+
+      return reply.continue()
+    })
 
     // Return the calling generator.
     return generator
