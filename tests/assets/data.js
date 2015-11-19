@@ -6,7 +6,7 @@ module.exports = (ontology, callback) => {
     name: "New World Code"
   })
   .catch(console.log.bind(console))
-  .then(user => {
+  .then(() => {
     ontology.collections.pet.create([
       {
         breed: "beagle",

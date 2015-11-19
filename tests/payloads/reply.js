@@ -3,6 +3,13 @@
 // Get the tools.
 const joi = require("joi")
 
+const errors = joi.object({
+  errors: joi.alternatives().try(
+    joi.array().items(joi.object()),
+    joi.object()
+  )
+})
+
 const user_schema = joi.object({
   id: joi.string().required(),
   type: joi.string().required(),
@@ -38,12 +45,18 @@ const pet_schema = joi.object({
 
 // Export schemas.
 module.exports = {
-  pet: joi.object({
-    data: joi.array().items(pet_schema),
-    included: joi.array().items(user_schema)
-  }),
-  user: joi.object({
-    data: user_schema,
-    included: joi.array()
-  })
+  pet: joi.alternatives().try(
+    joi.object({
+      data: joi.array().items(pet_schema),
+      included: joi.array().items(user_schema)
+    }),
+    errors
+  ),
+  user: joi.alternatives().try(
+    joi.object({
+      data: user_schema,
+      included: joi.array()
+    }),
+    errors
+  )
 }

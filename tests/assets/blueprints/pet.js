@@ -8,7 +8,7 @@ module.exports = {
 
     // Add a reference to User.
     owner: {
-      model: "user"
+      collection: "user"
     },
 
     // Add a reference to Collar.
