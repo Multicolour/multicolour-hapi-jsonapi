@@ -158,9 +158,11 @@ class Multicolour_Hapi_JSONAPI extends Map {
     Multicolour_Server_Hapi
       // Set it's validator to this plugin.
       .set("validator", this)
+
       // Set the response and payload validators to this plugin's.
       .reply("response_schema", this.get_response_schema.bind(this))
       .reply("payload_schema", this.get_payload_schema.bind(this))
+
       // Update the accept header to the one in the spec.
       .request("header_validator")
         .set("accept", joi.string()
@@ -186,6 +188,8 @@ class Multicolour_Hapi_JSONAPI extends Map {
         return reply.continue()
       }
 
+      // Modify the outward payload to be
+      // a valid JSON API structure.
       response.output.payload = {
         errors: {
           title: response.output.payload.error,
@@ -194,6 +198,7 @@ class Multicolour_Hapi_JSONAPI extends Map {
         }
       }
 
+      // Continue with any further processing.
       return reply.continue()
     })
 
