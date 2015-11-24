@@ -35,11 +35,11 @@
     "multicolour-server-hapi": "^1.0.12",
     "sails-memory": "^0.10.5",
     "tap-spec": "^4.1.0",
-    "tape": "^4.2.0"
+    "tape": "^4.2.0",
+    "multicolour": "^0.1.8"
   },
   "dependencies": {
     "joi": "^7.0.0",
-    "multicolour": "^0.1.8",
     "waterline-joi": "^1.0.11",
     "waterline-jsonapi": "^0.2.0"
   }
