@@ -33,7 +33,7 @@ const hapi = service.get("server").request("raw")
 const headers = { accept: "application/vnd.api+json" }
 
 // Run the tests.
-service.get("database").start((err, ontology) => {
+service.get("database").start(ontology => {
   require("./assets/data")(ontology, () => {
 
     // Generate the routes from the models in the database.
