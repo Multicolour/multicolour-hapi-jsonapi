@@ -137,6 +137,7 @@ class Multicolour_Hapi_JSONAPI extends Map {
    * @return {Hapi.Response} Hapi's response object for chaining.
    */
   generate_payload(results, collection) {
+    // Check for ambiguity.
     if (!collection && (!results.isBoom && !results.is_error)) {
       throw new TypeError(`
         Results not error and no collection for reply.\n
