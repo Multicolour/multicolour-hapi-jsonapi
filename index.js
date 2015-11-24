@@ -151,7 +151,8 @@ class Multicolour_Hapi_JSONAPI extends Map {
     // Get the JSON API formatter.
     const JSONAPIModel = require("waterline-jsonapi")
 
-    if (results.isBoom || results.is_error) {
+    // Check if it's an error.
+    if (results.isBoom || results.is_error || results instanceof Error) {
       // Create the jsonapi formatted response.
       return this.response(JSONAPIModel.new_from_error(results, collection).toJSON())
     }
