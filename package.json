@@ -1,6 +1,6 @@
 {
   "name": "multicolour-hapi-jsonapi",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "JSON API reply decorator built on Waterline and waterline-jsonapi",
   "main": "index.js",
   "scripts": {
