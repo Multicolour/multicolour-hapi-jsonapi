@@ -144,8 +144,7 @@ class Multicolour_Hapi_JSONAPI extends Map {
         Results arg is:
           ${results}
 
-        Collection arg is:
-          ${collection}
+        Collection arg is: ${collection.adapter.identity}
       `)
     }
 
