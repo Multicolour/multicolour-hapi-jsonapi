@@ -7,20 +7,41 @@ module.exports = (ontology, callback) => {
   })
   .catch(console.log.bind(console))
   .then(() => {
-    ontology.collections.pet.create([
+    ontology.collections.person.create([
       {
-        breed: "beagle",
-        type: "dog",
-        name: "Astro",
-        owner: 1
+        name: "Nikola Tesla",
+        age: 27
       },
       {
-        breed: "beagle",
-        type: "dog",
-        name: "Cosmo",
-        owner: 1
+        name: "Marconi",
+        age: 27
       }
     ])
-    .then(callback)
+    .then(() => {
+      ontology.collections.pet.create([
+        {
+          breed: "beagle",
+          type: "dog",
+          name: "Astro"
+        },
+        {
+          breed: "beagle",
+          type: "dog",
+          name: "Cosmo"
+        }
+      ])
+      .then(() => {
+        ontology.collections.pet
+          .find({})
+          .exec((err, pets) => {
+            pets.forEach(pet => {
+              pet.owners.add(1)
+              pet.owners.add(2)
+              pet.save(() => {})
+            })
+          })
+      })
+      .then(callback)
+    })
   })
 }

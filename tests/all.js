@@ -6,6 +6,12 @@ const tape = require("tape")
 const Multicolour = require("multicolour")
 const reply_payloads = require("./payloads/reply")
 
+const relations = {
+  pet: [ "owners" ],
+  collar: [ "pet" ],
+  person: []
+}
+
 // Set up a dummy service.
 const service = new Multicolour({
   content: `${__dirname}/assets`,
@@ -38,6 +44,16 @@ service.get("database").start(ontology => {
 
     // Generate the routes from the models in the database.
     service.get("server").generate_routes()
+    service.trigger("server_starting")
+
+    // Run the test with a helpful name.
+    tape(`Error "generate_payload" functional tests.`, test => {
+      const entity = service.get("server").get("validator")
+      test.throws(entity.generate_payload, TypeError, "Throws when incorrectly called without data or collection.")
+      test.throws(() => entity.generate_payload({ isBoom: true }, ontology.user), TypeError, "Throws when incorrectly called without data or collection.")
+      test.throws(() => entity.generate_payload({ isBoom: false, is_error: false }), TypeError, "Throws when incorrectly called without error payload or collection.")
+      test.end()
+    })
 
     // Loop over the payloads.
     Object.keys(reply_payloads).forEach(test_name => {
@@ -48,8 +64,7 @@ service.get("database").start(ontology => {
       }
 
       // Run the test with a helpful name.
-      tape(`GET /${test_name} test collection.`, test => {
-        // Create a request to the server without starting it.
+      tape(`GET /${test_name}.`, test => {
         hapi.inject(options, response => {
           test.equal(response.statusCode, 200, "Response code should be 200")
           test.equal(joi.validate(JSON.parse(response.payload), reply_payloads[test_name]).error, null, "Payload validation should have no errors.")
@@ -57,8 +72,24 @@ service.get("database").start(ontology => {
         })
       })
 
+      if (relations[test_name].length > 0) {
+        tape(`GET /${test_name}/1/relationships tests`, test => {
+          test.plan(relations[test_name].length)
+          relations[test_name].forEach(relation => {
+            hapi.inject({
+              url: `/${test_name}/1/relationships/${relation}`,
+              method: "GET",
+              headers
+            }, response => {
+              console.log(JSON.parse(response.payload))
+              test.equal(response.statusCode, 200, `GET /${test_name}/1/relationships/${relation}: Response code should be 200`)
+              // test.equal(joi.validate(JSON.parse(response.payload), reply_payloads[test_name]).error, null, "Payload validation should have no errors.")
+            })
+          })
+        })
+      }
+
       tape("Test error response", test => {
-        // Create a request to the server without starting it.
         hapi.inject(`/${test_name}`, response => {
           test.equal(response.statusCode, 400, "Response code should be 400")
           test.equal(joi.validate(JSON.parse(response.payload), reply_payloads[test_name]).error, null, "Error payload validation should have no errors.")

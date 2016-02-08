@@ -10,14 +10,12 @@ const errors = joi.object({
   )
 })
 
-const user_schema = joi.object({
+const person_schema = joi.object({
   id: joi.string().required(),
   type: joi.string().required(),
   attributes: joi.object({
-    username: joi.string().required(),
     name: joi.string().required(),
-    requires_password: joi.boolean(),
-    requires_email: joi.boolean(),
+    age: joi.number().required(),
     createdAt: joi.date(),
     updatedAt: joi.date()
   })
@@ -34,11 +32,17 @@ const pet_schema = joi.object({
     updatedAt: joi.date()
   }),
   relationships: joi.object({
-    owner: joi.object({
-      data: joi.object({
-        type: joi.string().required(),
-        id: joi.string().required()
-      })
+    owners: joi.object({
+      data: joi.alternatives().try(
+        joi.object({
+          type: joi.string().required(),
+          id: joi.string().required()
+        }),
+        joi.array().items(joi.object({
+          type: joi.string().required(),
+          id: joi.string().required()
+        }))
+      )
     })
   })
 })
@@ -47,14 +51,18 @@ const pet_schema = joi.object({
 module.exports = {
   pet: joi.alternatives().try(
     joi.object({
+      data: pet_schema,
+      included: joi.array().items(person_schema)
+    }),
+    joi.object({
       data: joi.array().items(pet_schema),
-      included: joi.array().items(user_schema)
+      included: joi.array().items(person_schema)
     }),
     errors
   ),
-  user: joi.alternatives().try(
+  person: joi.alternatives().try(
     joi.object({
-      data: user_schema,
+      data: joi.alternatives().try(person_schema, joi.array().items(person_schema)),
       included: joi.array()
     }),
     errors
