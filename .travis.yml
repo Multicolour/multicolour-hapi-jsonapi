@@ -18,7 +18,7 @@ after_script:
 
 addons:
   code_climate:
-    repo_token: cbfd1ce2c7fdfb4d734f661d89fb7d492a976f6586cea6b1c5851ebc71dc8869
+    repo_token: uMKvuaqZGwGNCUUmRsBD7YW7lhwKgPe8O
 
 notifications:
   webhooks:
