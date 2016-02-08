@@ -3,6 +3,7 @@
 // Get our tools.
 const joi = require("joi")
 const waterline_joi = require("waterline-joi")
+const handlers = require("multicolour/lib/handlers")
 
 /**
  * Shallow clone the provided object.
@@ -61,6 +62,100 @@ class Multicolour_Hapi_JSONAPI extends Map {
       .set("generator", generator.request("host"))
 
     return this
+  }
+
+  generate_related_resource_routes(server, multicolour) {
+    // Get the collections.
+    const collections = multicolour.get("database").get("models")
+
+    // Get the models that have associations.
+    const models = Object.keys(collections)
+      .filter(model_name => !collections[model_name].meta.junctionTable)
+      .map(model_name => collections[model_name])
+
+    // Get the headers.
+    const headers = joi.object(multicolour.request("header_validator").get())
+      .options({ allowUnknown: true })
+
+    models.forEach(model => {
+      // Clone the attributes to prevent
+      // any accidental overriding/side affects.
+      const attributes = clone_attributes(model._attributes)
+
+      // Save typing later.
+      const name = model.adapter.identity
+
+      // Get any relationships this model has.
+      const model_relationships = Object.keys(attributes)
+        .filter(attribute_name => model._attributes[attribute_name].model || model._attributes[attribute_name].collection)
+
+      // Maps the relationship name back to the relevant
+      // model in the collections array.
+      const relationship_to = {}
+      model_relationships.forEach(relationship_name => {
+        const related_model = collections[model._attributes[relationship_name].model || model._attributes[relationship_name].collection]
+
+        relationship_to[relationship_name] = related_model
+      })
+
+      // Route those relationships.
+      server.route(
+        model_relationships.map(relationship_name => {
+          let query_key = model._attributes[relationship_name].model ? "id" : name
+
+          return {
+            method: "GET",
+            path: `/${name}/{${query_key}}/relationships/${relationship_name}`,
+            config: {
+              // auth: this.get_auth_config(),
+              handler: (request, reply) => {
+                // Merge the params into the query string params.
+                request.url.query = require("util")._extend(request.url.query, request.params)
+
+                // Call the handler.
+                if (query_key === "id") {
+                  return handlers.GET.call(model, request, (err, models) => {
+                    if (err) {
+                      reply[this.get("decorator_name")](err, model)
+                    }
+                    else {
+                      // Get the ids of the related models.
+                      const ids = models.map(model => model[relationship_name].id)
+
+                      // Get them.
+                      relationship_to[relationship_name]
+                        .find({ id: ids })
+                        .populateAll()
+                        .exec((err, models) =>
+                          reply[this.get("decorator_name")](models.map(model => model.toJSON()), relationship_to[relationship_name]))
+                    }
+                  })
+                }
+                else {
+                  return handlers.GET.call(relationship_to[relationship_name], request, (err, models) =>
+                    reply[this.get("decorator_name")](err || models, relationship_to[relationship_name])
+                  )
+                }
+              },
+              description: `Get ${relationship_name} related to ${name}.`,
+              notes: `Get ${relationship_name} related to ${name}.`,
+              tags: ["api", "relationships"],
+              validate: {
+                headers,
+                params: joi.object({
+                  [query_key]: joi.string().required()
+                })
+              },
+              response: {
+                schema: this.get_response_schema(relationship_to[relationship_name]).meta({
+                  className: `related_${relationship_name}`
+                })
+              }
+            }
+          }
+        })
+      )
+    })
   }
 
   /**
@@ -171,6 +266,7 @@ class Multicolour_Hapi_JSONAPI extends Map {
     const generator = this.get("generator")
     const server = generator.request("raw")
     const name = this.get("decorator_name")
+    const multicolour = generator.request("host")
 
     // Register with the server some properties it requires.
     Multicolour_Server_Hapi
@@ -193,6 +289,16 @@ class Multicolour_Hapi_JSONAPI extends Map {
 
     // Decorate the reply.
     server.decorate("reply", name, this.generate_payload)
+
+    // Register related resource endpoints
+    // once the database has been started
+    // and before the http server is started.
+    multicolour.on("server_starting", () =>
+      this.generate_related_resource_routes(
+        server,
+        multicolour
+      )
+    )
 
     // Listen for replies so we can transform any boom
     // responses to be JSON API compliant.
