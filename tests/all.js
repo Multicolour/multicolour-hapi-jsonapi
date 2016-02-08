@@ -81,7 +81,6 @@ service.get("database").start(ontology => {
               method: "GET",
               headers
             }, response => {
-              console.log(JSON.parse(response.payload))
               test.equal(response.statusCode, 200, `GET /${test_name}/1/relationships/${relation}: Response code should be 200`)
               // test.equal(joi.validate(JSON.parse(response.payload), reply_payloads[test_name]).error, null, "Payload validation should have no errors.")
             })
