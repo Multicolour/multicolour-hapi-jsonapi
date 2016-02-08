@@ -116,11 +116,12 @@ class Multicolour_Hapi_JSONAPI extends Map {
                 if (query_key === "id") {
                   return handlers.GET.call(model, request, (err, models) => {
                     if (err) {
+                      /* istanbul ignore next */
                       reply[this.get("decorator_name")](err, model)
                     }
                     else {
                       // Get the ids of the related models.
-                      const ids = models.map(model => model[relationship_name].id)
+                      const ids = models.map(model => model[relationship_name] && model[relationship_name].id)
 
                       // Get them.
                       relationship_to[relationship_name]
@@ -267,6 +268,8 @@ class Multicolour_Hapi_JSONAPI extends Map {
     const server = generator.request("raw")
     const name = this.get("decorator_name")
     const multicolour = generator.request("host")
+
+    handlers.set_host(multicolour)
 
     // Register with the server some properties it requires.
     Multicolour_Server_Hapi
