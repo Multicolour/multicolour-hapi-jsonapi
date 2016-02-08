@@ -9,7 +9,7 @@ const reply_payloads = require("./payloads/reply")
 const relations = {
   pet: [ "owners" ],
   collar: [ "pet" ],
-  person: []
+  person: [ "user" ]
 }
 
 // Set up a dummy service.

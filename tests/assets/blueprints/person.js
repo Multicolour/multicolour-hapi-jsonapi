@@ -13,6 +13,10 @@ module.exports = {
       size: 8,
       min: 1,
       max: 130
+    },
+
+    user: {
+      model: "user"
     }
   }
 }

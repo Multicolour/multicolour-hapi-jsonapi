@@ -10,11 +10,13 @@ module.exports = (ontology, callback) => {
     ontology.collections.person.create([
       {
         name: "Nikola Tesla",
-        age: 27
+        age: 27,
+        user: 1
       },
       {
         name: "Marconi",
-        age: 27
+        age: 27,
+        user: 1
       }
     ])
     .then(() => {
