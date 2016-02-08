@@ -1,0 +1,29 @@
+language: node_js
+node_js:
+  - "4.1"
+  - "4.0"
+  - "5.0"
+  - "5.1"
+  - "5.2"
+  - "5.3"
+  - "5.4"
+
+sudo: false
+
+script:
+  - "npm run test-coverage"
+
+after_script:
+  - "npm install coveralls@2 && cat ./coverage/lcov.info | ./node_modules/.bin/coveralls"
+
+addons:
+  code_climate:
+    repo_token: cbfd1ce2c7fdfb4d734f661d89fb7d492a976f6586cea6b1c5851ebc71dc8869
+
+notifications:
+  webhooks:
+    urls:
+      - https://webhooks.gitter.im/e/1e2572b1e7e38d54662b
+    on_success: change
+    on_failure: always
+    on_start: never
