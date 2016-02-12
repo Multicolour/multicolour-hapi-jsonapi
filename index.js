@@ -2,6 +2,7 @@
 
 // Get our tools.
 const joi = require("joi")
+const extend = require("util")._extend
 const waterline_joi = require("waterline-joi")
 const handlers = require("multicolour/lib/handlers")
 
@@ -92,6 +93,12 @@ class Multicolour_Hapi_JSONAPI extends Map {
     }
   }
 
+  /**
+   * Generate routes for related resources to this model.
+   * @param  {Hapi} server to register routes on.
+   * @param  {Multicolour} multicolour instance to get config from.
+   * @return {void}
+   */
   generate_related_resource_routes(server, multicolour) {
     // Get the collections.
     const collections = multicolour.get("database").get("models")
@@ -138,7 +145,7 @@ class Multicolour_Hapi_JSONAPI extends Map {
               auth: this.get_auth_config(model, multicolour.get("server").request("auth_config")),
               handler: (request, reply) => {
                 // Merge the params into the query string params.
-                request.url.query = require("util")._extend(request.url.query, request.params)
+                request.url.query = extend(request.url.query, request.params)
 
                 // Call the handler.
                 if (query_key === "id") {
@@ -240,7 +247,6 @@ class Multicolour_Hapi_JSONAPI extends Map {
    */
   get_payload_schema(collection) {
     // Get our tools.
-    const extend = require("util")._extend
     const attributes = clone_attributes(collection._attributes)
 
     // Extend our attributes over some Waterline defaults.
