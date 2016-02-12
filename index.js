@@ -64,6 +64,34 @@ class Multicolour_Hapi_JSONAPI extends Map {
     return this
   }
 
+  /**
+   * Get any auth configuration
+   * @param {Waterline.Collection} Collection to get auth roles from.
+   * @param {String|Boolean} Name of the auth strategy to use or false.
+   * @return {Object|Boolean} Auth will be false if none, otherwise an object.
+   */
+  get_auth_config(model, auth_strategy_name) {
+    if (!auth_strategy_name) {
+      return false
+    }
+
+    // If there's a specific role object
+    // for this verb, set it.
+    if (model.roles) {
+      return {
+        strategy: auth_strategy_name,
+        scope: model.roles.get || model.roles
+      }
+    }
+    // Otherwise, just use the defaults.
+    else {
+      return {
+        strategy: auth_strategy_name,
+        scope: ["user", "admin", "consumer"]
+      }
+    }
+  }
+
   generate_related_resource_routes(server, multicolour) {
     // Get the collections.
     const collections = multicolour.get("database").get("models")
@@ -107,7 +135,7 @@ class Multicolour_Hapi_JSONAPI extends Map {
             method: "GET",
             path: `/${name}/{${query_key}}/relationships/${relationship_name}`,
             config: {
-              // auth: this.get_auth_config(),
+              auth: this.get_auth_config(model, multicolour.get("server").request("auth_config")),
               handler: (request, reply) => {
                 // Merge the params into the query string params.
                 request.url.query = require("util")._extend(request.url.query, request.params)
