@@ -18,5 +18,9 @@ module.exports = {
     user: {
       model: "user"
     }
+  },
+
+  roles: {
+    get: ["user"]
   }
 }
