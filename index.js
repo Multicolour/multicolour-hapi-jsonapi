@@ -331,10 +331,7 @@ class Multicolour_Hapi_JSONAPI extends Map {
     // once the database has been started
     // and before the http server is started.
     multicolour.on("server_starting", () =>
-      this.generate_related_resource_routes(
-        server,
-        multicolour
-      )
+      this.generate_related_resource_routes(server, multicolour)
     )
 
     // Listen for replies so we can transform any boom
