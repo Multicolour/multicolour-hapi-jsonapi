@@ -316,7 +316,7 @@ class Multicolour_Hapi_JSONAPI extends Map {
 
       // Update the accept header to the one in the spec.
       .request("header_validator")
-        .set("accept", joi.string()
+        .set("Accept", joi.string()
           .valid("application/vnd.api+json")
           .default("application/vnd.api+json")
           .required())
