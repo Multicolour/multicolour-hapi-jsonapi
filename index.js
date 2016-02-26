@@ -7,6 +7,8 @@ const waterline_joi = require("waterline-joi")
 const handlers = require("multicolour/lib/handlers")
 const utils = require("./utils")
 
+// Used a lot below.
+const CN_NAME = "application/vnd.api+json"
 
 class Multicolour_Hapi_JSONAPI extends Map {
 
@@ -20,9 +22,7 @@ class Multicolour_Hapi_JSONAPI extends Map {
     super()
 
     // Set the defaults.
-    this
-      .set("decorator_name", "jsonapi")
-      .set("generator", generator.request("host"))
+    this.set("multicolour", generator.request("host"))
 
     return this
   }
@@ -56,12 +56,32 @@ class Multicolour_Hapi_JSONAPI extends Map {
   }
 
   /**
+   * There can be many different validators,
+   * they can add different content types.
+   * @param  {Array} validators to get response schemas from.
+   * @param  {Waterline.Collection} collection to get schema for.
+   * @return {Array} array of joi schemas.
+   */
+  get_response_schemas(validators, collection) {
+    // Used in an .apply later.
+    const response_alternatives = joi.alternatives()
+
+    // Return the schemas.
+    return response_alternatives.try.apply(
+      response_alternatives,
+      validators.map(validator => validator.get_response_schema(collection))
+    )
+  }
+
+  /**
    * Generate routes for related resources to this model.
    * @param  {Hapi} server to register routes on.
    * @param  {Multicolour} multicolour instance to get config from.
    * @return {void}
    */
-  generate_related_resource_routes(server, multicolour) {
+  generate_related_resource_routes(server) {
+    const multicolour = this.get("multicolour")
+
     // Get the collections.
     const collections = multicolour.get("database").get("models")
 
@@ -77,7 +97,7 @@ class Multicolour_Hapi_JSONAPI extends Map {
     models.forEach(model => {
       // Clone the attributes to prevent
       // any accidental overriding/side affects.
-      const attributes = clone_attributes(model._attributes)
+      const attributes = utils.clone_attributes(model._attributes)
 
       // Save typing later.
       const name = model.adapter.identity
@@ -114,7 +134,7 @@ class Multicolour_Hapi_JSONAPI extends Map {
                   return handlers.GET.call(model, request, (err, models) => {
                     if (err) {
                       /* istanbul ignore next */
-                      reply[this.get("decorator_name")](err, model)
+                      reply[request.headers.accept](err, model)
                     }
                     else {
                       // Get the ids of the related models.
@@ -125,13 +145,13 @@ class Multicolour_Hapi_JSONAPI extends Map {
                         .find({ id: ids })
                         .populateAll()
                         .exec((err, models) =>
-                          reply[this.get("decorator_name")](models.map(model => model.toJSON()), relationship_to[relationship_name]))
+                          reply[request.headers.accept](models.map(model => model.toJSON()), relationship_to[relationship_name]))
                     }
                   })
                 }
                 else {
                   return handlers.GET.call(relationship_to[relationship_name], request, (err, models) =>
-                    reply[this.get("decorator_name")](err || models, relationship_to[relationship_name])
+                    reply[request.headers.accept](err || models, relationship_to[relationship_name])
                   )
                 }
               },
@@ -145,9 +165,8 @@ class Multicolour_Hapi_JSONAPI extends Map {
                 })
               },
               response: {
-                schema: this.get_response_schema(relationship_to[relationship_name]).meta({
-                  className: `related_${relationship_name}`
-                })
+                schema: this.get_response_schemas(multicolour.get("server").get("validators"), relationship_to[relationship_name])
+                    .meta({ className: `related_${relationship_name}` })
               }
             }
           }
@@ -163,10 +182,10 @@ class Multicolour_Hapi_JSONAPI extends Map {
    */
   get_response_schema(collection) {
     // Clone the attributes.
-    const attributes = clone_attributes(collection._attributes)
+    const attributes = utils.clone_attributes(collection._attributes)
 
     // Get the model since we're going to rid of the `id` attribute.
-    const model = check_and_fix_associations(attributes, "object")
+    const model = utils.check_and_fix_associations(attributes, "object")
     delete model.id
 
     // Generate a Joi schema from a fixed version of the attributes.
@@ -209,7 +228,7 @@ class Multicolour_Hapi_JSONAPI extends Map {
    */
   get_payload_schema(collection) {
     // Get our tools.
-    const attributes = clone_attributes(collection._attributes)
+    const attributes = utils.clone_attributes(collection._attributes)
 
     // Extend our attributes over some Waterline defaults.
     extend({
@@ -219,7 +238,7 @@ class Multicolour_Hapi_JSONAPI extends Map {
     }, attributes)
 
     // Return the schema.
-    return waterline_joi(check_and_fix_associations(attributes, "string"))
+    return waterline_joi(utils.check_and_fix_associations(attributes, "string"))
   }
 
   /**
@@ -260,34 +279,28 @@ class Multicolour_Hapi_JSONAPI extends Map {
    */
   register(Multicolour_Server_Hapi) {
     // Get the server and decorator name.
-    const generator = this.get("generator")
-    const server = generator.request("raw")
-    const name = this.get("decorator_name")
-    const multicolour = generator.request("host")
+    const multicolour = this.get("multicolour")
+    const server = Multicolour_Server_Hapi.request("raw")
+    const header_validator = Multicolour_Server_Hapi.request("header_validator")
 
+    // We need the host setting on the handlers
+    // so that they can fetch various models.
     handlers.set_host(multicolour)
 
-    // Register with the server some properties it requires.
-    Multicolour_Server_Hapi
-      // Set it's validator to this plugin.
-      .set("validator", this)
+    // Add this validator to the list.
+    Multicolour_Server_Hapi.get("validators").push(this)
 
-      // Set the response and payload validators to this plugin's.
-      .reply("response_schema", this.get_response_schema.bind(this))
-      .reply("payload_schema", this.get_payload_schema.bind(this))
+    // Multicolour_Server_Hapi
+    //   .reply("response_schema", this.get_response_schema.bind(this))
+    //   .reply("payload_schema", this.get_payload_schema.bind(this))
 
-      // Update the accept header to the one in the spec.
-      .request("header_validator")
-        .set("Accept", joi.string()
-          .valid("application/vnd.api+json")
-          .default("application/vnd.api+json")
-          .required())
-
-    // Set the new decorator name.
-    generator.reply("decorator", name)
+    // Update the accept header to the one in the spec.
+    header_validator.set("accept", header_validator.get("accept")
+      .valid(CN_NAME)
+      .default(CN_NAME))
 
     // Decorate the reply.
-    server.decorate("reply", name, this.generate_payload)
+    server.decorate("reply", CN_NAME, this.generate_payload)
 
     // Register related resource endpoints
     // once the database has been started
@@ -323,7 +336,7 @@ class Multicolour_Hapi_JSONAPI extends Map {
     })
 
     // Return the calling generator.
-    return generator
+    return Multicolour_Server_Hapi
   }
 }
 
