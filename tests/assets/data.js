@@ -5,7 +5,9 @@ module.exports = (ontology, callback) => {
     username: "multicolour-hapi-jsonapi",
     name: "New World Code"
   })
+  /* eslint-disable */
   .catch(console.log.bind(console))
+  /* eslint-enable */
   .then(() => {
     ontology.collections.person.create([
       {
