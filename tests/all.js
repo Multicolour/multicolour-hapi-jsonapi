@@ -48,9 +48,9 @@ service.get("database").start(ontology => {
 
     // Run the test with a helpful name.
     tape(`Error "generate_payload" functional tests.`, test => {
-      const entity = service.get("server").get("validator")
+      const entity = service.get("server").get("validators")[1]
       test.throws(entity.generate_payload, TypeError, "Throws when incorrectly called without data or collection.")
-      test.throws(() => entity.generate_payload({ isBoom: true }, ontology.user), TypeError, "Throws when incorrectly called without data or collection.")
+      test.throws(() => entity.generate_payload({ isBoom: true }, ontology.multicolour_user), TypeError, "Throws when incorrectly called without data or collection.")
       test.throws(() => entity.generate_payload({ isBoom: false, is_error: false }), TypeError, "Throws when incorrectly called without error payload or collection.")
       test.end()
     })

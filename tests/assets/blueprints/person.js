@@ -16,7 +16,7 @@ module.exports = {
     },
 
     user: {
-      model: "user"
+      model: "multicolour_user"
     }
   },
 
