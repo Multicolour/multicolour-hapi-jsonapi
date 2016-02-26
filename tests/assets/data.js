@@ -1,7 +1,7 @@
 "use strict"
 
 module.exports = (ontology, callback) => {
-  return ontology.collections.user.create({
+  return ontology.collections.multicolour_user.create({
     username: "multicolour-hapi-jsonapi",
     name: "New World Code"
   })
