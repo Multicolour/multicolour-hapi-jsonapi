@@ -290,10 +290,6 @@ class Multicolour_Hapi_JSONAPI extends Map {
     // Add this validator to the list.
     Multicolour_Server_Hapi.get("validators").push(this)
 
-    // Multicolour_Server_Hapi
-    //   .reply("response_schema", this.get_response_schema.bind(this))
-    //   .reply("payload_schema", this.get_payload_schema.bind(this))
-
     // Update the accept header to the one in the spec.
     header_validator.set("accept", header_validator.get("accept")
       .valid(CN_NAME)
