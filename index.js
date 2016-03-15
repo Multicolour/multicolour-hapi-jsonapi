@@ -73,6 +73,28 @@ class Multicolour_Hapi_JSONAPI extends Map {
     )
   }
 
+  get_error_schema() {
+    const error_schema = joi.object({
+      id: joi.string(),
+      links: joi.object({
+        about: joi.string()
+      }),
+      status: joi.string().regex(/[0-9]/g),
+      code: joi.string().regex(/[0-9]/g),
+      title: joi.string(),
+      detail: joi.string(),
+      source: joi.object({
+        pointer: joi.string(),
+        parameter: joi.string()
+      }),
+      meta: joi.object()
+    })
+
+    return joi.object({
+      errors: joi.alternatives().try(error_schema, joi.array().items(error_schema))
+    })
+  }
+
   /**
    * Generate routes for related resources to this model.
    * @param  {Hapi} server to register routes on.
@@ -94,85 +116,90 @@ class Multicolour_Hapi_JSONAPI extends Map {
     const headers = joi.object(multicolour.request("header_validator").get())
       .options({ allowUnknown: true })
 
-    models.forEach(model => {
-      // Clone the attributes to prevent
-      // any accidental overriding/side affects.
-      const attributes = utils.clone_attributes(model._attributes)
+    models
+      // Don't do any generation for models that
+      // specifically say not to.
+      .filter(model => !model.NO_AUTO_GEN_ROUTES)
+      // All others, start generating.
+      .forEach(model => {
+        // Clone the attributes to prevent
+        // any accidental overriding/side affects.
+        const attributes = utils.clone_attributes(model._attributes)
 
-      // Save typing later.
-      const name = model.adapter.identity
+        // Save typing later.
+        const name = model.adapter.identity
 
-      // Get any relationships this model has.
-      const model_relationships = Object.keys(attributes)
-        .filter(attribute_name => model._attributes[attribute_name].model || model._attributes[attribute_name].collection)
+        // Get any relationships this model has.
+        const model_relationships = Object.keys(attributes)
+          .filter(attribute_name => model._attributes[attribute_name].model || model._attributes[attribute_name].collection)
 
-      // Maps the relationship name back to the relevant
-      // model in the collections array.
-      const relationship_to = {}
-      model_relationships.forEach(relationship_name => {
-        const related_model = collections[model._attributes[relationship_name].model || model._attributes[relationship_name].collection]
+        // Maps the relationship name back to the relevant
+        // model in the collections array.
+        const relationship_to = {}
+        model_relationships.forEach(relationship_name => {
+          const related_model = collections[model._attributes[relationship_name].model || model._attributes[relationship_name].collection]
 
-        relationship_to[relationship_name] = related_model
-      })
+          relationship_to[relationship_name] = related_model
+        })
 
-      // Route those relationships.
-      server.route(
-        model_relationships.map(relationship_name => {
-          let query_key = model._attributes[relationship_name].model ? "id" : name
+        // Route those relationships.
+        server.route(
+          model_relationships.map(relationship_name => {
+            let query_key = model._attributes[relationship_name].model ? "id" : name
 
-          return {
-            method: "GET",
-            path: `/${name}/{${query_key}}/relationships/${relationship_name}`,
-            config: {
-              auth: this.get_auth_config(model, multicolour.get("server").request("auth_config")),
-              handler: (request, reply) => {
-                // Merge the params into the query string params.
-                request.url.query = extend(request.url.query, request.params)
+            return {
+              method: "GET",
+              path: `/${name}/{${query_key}}/relationships/${relationship_name}`,
+              config: {
+                auth: this.get_auth_config(model, multicolour.get("server").request("auth_config")),
+                handler: (request, reply) => {
+                  // Merge the params into the query string params.
+                  request.url.query = extend(request.url.query, request.params)
 
-                // Call the handler.
-                if (query_key === "id") {
-                  return handlers.GET.call(model, request, (err, models) => {
-                    if (err) {
-                      /* istanbul ignore next */
-                      reply[request.headers.accept](err, model)
-                    }
-                    else {
-                      // Get the ids of the related models.
-                      const ids = models.map(model => model[relationship_name] && model[relationship_name].id)
+                  // Call the handler.
+                  if (query_key === "id") {
+                    return handlers.GET.call(model, request, (err, models) => {
+                      if (err) {
+                        /* istanbul ignore next */
+                        reply[request.headers.accept](err, model)
+                      }
+                      else {
+                        // Get the ids of the related models.
+                        const ids = models.map(model => model[relationship_name] && model[relationship_name].id)
 
-                      // Get them.
-                      relationship_to[relationship_name]
-                        .find({ id: ids })
-                        .populateAll()
-                        .exec((err, models) =>
-                          reply[request.headers.accept](models.map(model => model.toJSON()), relationship_to[relationship_name]))
-                    }
+                        // Get them.
+                        relationship_to[relationship_name]
+                          .find({ id: ids })
+                          .populateAll()
+                          .exec((err, models) =>
+                            reply[request.headers.accept](models.map(model => model.toJSON()), relationship_to[relationship_name]))
+                      }
+                    })
+                  }
+                  else {
+                    return handlers.GET.call(relationship_to[relationship_name], request, (err, models) =>
+                      reply[request.headers.accept](err || models, relationship_to[relationship_name])
+                    )
+                  }
+                },
+                description: `Get ${relationship_name} related to ${name}.`,
+                notes: `Get ${relationship_name} related to ${name}.`,
+                tags: ["api", "relationships"],
+                validate: {
+                  headers,
+                  params: joi.object({
+                    [query_key]: joi.string().required()
                   })
+                },
+                response: {
+                  schema: this.get_response_schemas(multicolour.get("server").get("validators"), relationship_to[relationship_name])
+                      .meta({ className: `related_${relationship_name}` })
                 }
-                else {
-                  return handlers.GET.call(relationship_to[relationship_name], request, (err, models) =>
-                    reply[request.headers.accept](err || models, relationship_to[relationship_name])
-                  )
-                }
-              },
-              description: `Get ${relationship_name} related to ${name}.`,
-              notes: `Get ${relationship_name} related to ${name}.`,
-              tags: ["api", "relationships"],
-              validate: {
-                headers,
-                params: joi.object({
-                  [query_key]: joi.string().required()
-                })
-              },
-              response: {
-                schema: this.get_response_schemas(multicolour.get("server").get("validators"), relationship_to[relationship_name])
-                    .meta({ className: `related_${relationship_name}` })
               }
             }
-          }
-        })
-      )
-    })
+          })
+        )
+      })
   }
 
   /**
