@@ -6,6 +6,7 @@ const extend = require("util")._extend
 const waterline_joi = require("waterline-joi")
 const handlers = require("multicolour/lib/handlers")
 const utils = require("./utils")
+const Waterline_JSONAPI = require("waterline-jsonapi")
 
 // Used a lot below.
 const CN_NAME = "application/vnd.api+json"
@@ -143,13 +144,13 @@ class Multicolour_Hapi_JSONAPI extends Map {
         })
 
         // Route those relationships.
-        server.route(
+        const relationships_full =
           model_relationships.map(relationship_name => {
             let query_key = model._attributes[relationship_name].model ? "id" : name
 
             return {
               method: "GET",
-              path: `/${name}/{${query_key}}/relationships/${relationship_name}`,
+              path: `/${name}/{${query_key}}/${relationship_name}`,
               config: {
                 auth: this.get_auth_config(model, multicolour.get("server").request("auth_config")),
                 handler: (request, reply) => {
@@ -169,7 +170,7 @@ class Multicolour_Hapi_JSONAPI extends Map {
 
                         // Get them.
                         relationship_to[relationship_name]
-                          .find({ id: ids })
+                          .find({ [name]: request.params[query_key] })
                           .populateAll()
                           .exec((err, models) =>
                             reply[request.headers.accept](models.map(model => model.toJSON()), relationship_to[relationship_name]))
@@ -198,8 +199,102 @@ class Multicolour_Hapi_JSONAPI extends Map {
               }
             }
           })
-        )
+
+        // Route those relationships.
+        const relationship_object =
+          model_relationships.map(relationship_name => {
+            let query_key = model._attributes[relationship_name].model ? "id" : name
+
+            return {
+              method: "GET",
+              path: `/${name}/{${query_key}}/relationships/${relationship_name}`,
+              config: {
+                auth: this.get_auth_config(model, multicolour.get("server").request("auth_config")),
+                handler: (request, reply) => {
+                  // Set the meta.
+                  const meta = {
+                    context: "related",
+                    is_relationships: true,
+                    relationships_type_filter: name
+                  }
+
+                  // The decorator method to call.
+                  const method = request.headers.accept
+
+                  // Merge the params into the query string params.
+                  request.url.query = extend(request.url.query, request.params)
+
+                  // Call the handler.
+                  if (query_key === "id") {
+                    return handlers.GET.call(model, request, (err, models) => {
+                      if (err) {
+                        /* istanbul ignore next */
+                        reply[method](err, model, meta)
+                      }
+                      else {
+                        // Get the ids of the related models.
+                        const ids = models.map(model => model[relationship_name] && model[relationship_name].id)
+
+                        // Get them.
+                        relationship_to[relationship_name]
+                          .find({ [name]: ids }, { fields: ["id", name] })
+                          .populateAll()
+                          .exec((err, models) => {
+                            reply[method](models.map(model => model.toJSON()), relationship_to[relationship_name], meta)
+                          })
+                      }
+                    })
+                  }
+                  else {
+                    relationship_to[relationship_name]
+                      .find({ [name]: request.params[name] }, { fields: ["id", name] })
+                      .populateAll()
+                      .exec((err, models) =>{
+                        reply[method](models.map(model => model.toJSON()), relationship_to[relationship_name], meta)
+                      })
+                  }
+                },
+                description: `Get ${relationship_name} related to ${name}.`,
+                notes: `Get ${relationship_name} related to ${name}.`,
+                tags: ["api", "relationships"],
+                validate: {
+                  headers,
+                  params: joi.object({
+                    [query_key]: joi.string().required()
+                  })
+                },
+                response: {
+                  schema: this.get_related_schema().meta({ className: `related_${relationship_name}` })
+                }
+              }
+            }
+          })
+
+        // Route the relationship entities.
+        server.route(relationships_full)
+        server.route(relationship_object)
       })
+  }
+
+  get_links_schema() {
+    return joi.object({
+      self: joi.string(),
+      last: joi.string(),
+      next: joi.string(),
+      related: joi.string()
+    })
+  }
+
+  get_related_schema() {
+    const data = joi.object({
+      id: joi.string().required(),
+      type: joi.string().required()
+    })
+
+    return joi.object({
+      links: this.get_links_schema(),
+      data: joi.alternatives().try(joi.array().items(data), data)
+    })
   }
 
   /**
@@ -223,7 +318,8 @@ class Multicolour_Hapi_JSONAPI extends Map {
       id: joi.string().required(),
       type: joi.string().required(),
       attributes: payload,
-      relationships: joi.object()
+      relationships: joi.object(),
+      links: joi.object()
     })
 
     // This is an `alternatives` because entities may,
@@ -231,15 +327,11 @@ class Multicolour_Hapi_JSONAPI extends Map {
     // been an error.
     return joi.alternatives().try(
       joi.object({
+        links: this.get_links_schema(),
         data: joi.alternatives().try(
           joi.array().items(data_payload),
           data_payload
         ),
-        links: joi.object({
-          self: joi.string().uri(),
-          last: joi.string().uri(),
-          next: joi.string().uri()
-        }),
         included: joi.array()
       }),
       joi.object({
@@ -274,7 +366,7 @@ class Multicolour_Hapi_JSONAPI extends Map {
    * @param  {Waterline.Collection} collection the results are from.
    * @return {Hapi.Response} Hapi's response object for chaining.
    */
-  generate_payload(results, collection) {
+  generate_payload(results, collection, meta) {
     // Check for ambiguity.
     if (!collection && (!results.isBoom && !results.is_error)) {
       throw new TypeError(`
@@ -286,18 +378,9 @@ class Multicolour_Hapi_JSONAPI extends Map {
       `)
     }
 
-    // Get the JSON API formatter.
-    const JSONAPIModel = require("waterline-jsonapi")
-
     // Check if it's an error.
-    if (results.isBoom || results.is_error || results instanceof Error) {
-      // Create the jsonapi formatted response.
-      return this.response(JSONAPIModel.new_from_error(results, collection).toJSON())
-    }
-    else {
-      // Create the jsonapi formatted response.
-      return this.response(JSONAPIModel.create(results, collection).toJSON())
-    }
+    return new Waterline_JSONAPI(results, collection, meta).generate()
+      .then(payload => this.response(payload))
   }
 
   /**
