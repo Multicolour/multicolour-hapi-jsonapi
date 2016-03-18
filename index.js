@@ -159,23 +159,11 @@ class Multicolour_Hapi_JSONAPI extends Map {
 
                   // Call the handler.
                   if (query_key === "id") {
-                    return handlers.GET.call(model, request, (err, models) => {
-                      if (err) {
-                        /* istanbul ignore next */
-                        reply[request.headers.accept](err, model)
-                      }
-                      else {
-                        // Get the ids of the related models.
-                        const ids = models.map(model => model[relationship_name] && model[relationship_name].id)
-
-                        // Get them.
-                        relationship_to[relationship_name]
-                          .find({ [name]: request.params[query_key] })
-                          .populateAll()
-                          .exec((err, models) =>
-                            reply[request.headers.accept](models.map(model => model.toJSON()), relationship_to[relationship_name]))
-                      }
-                    })
+                    return relationship_to[relationship_name]
+                      .find({ [name]: request.params[query_key] })
+                      .populateAll()
+                      .exec((err, models) =>
+                        reply[request.headers.accept](models.map(model => model.toJSON()), relationship_to[relationship_name]))
                   }
                   else {
                     return handlers.GET.call(relationship_to[relationship_name], request, (err, models) =>
@@ -368,18 +356,23 @@ class Multicolour_Hapi_JSONAPI extends Map {
    */
   generate_payload(results, collection, meta) {
     // Check for ambiguity.
-    if (!collection && (!results.isBoom && !results.is_error)) {
-      throw new TypeError(`
-        Results not error and no collection for reply.\n
-        Results arg is:
-          ${results}
+    if (!results || !collection) {
+      throw new ReferenceError(`
+        generate_payload called without results or collection
 
-        Collection arg is: ${collection.adapter.identity}
+        results: ${typeof results}
+        collection: ${typeof collection}
       `)
     }
 
     // Check if it's an error.
-    return new Waterline_JSONAPI(results, collection, meta).generate()
+    const generator = new Waterline_JSONAPI(results, collection, meta)
+
+    // Add the API root url to the generator.
+    generator.api_root = this.request.server.info.uri
+
+    // Start converting.
+    generator.generate()
       .then(payload => this.response(payload))
   }
 
