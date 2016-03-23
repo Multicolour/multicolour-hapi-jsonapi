@@ -372,11 +372,8 @@ class Multicolour_Hapi_JSONAPI extends Map {
     generator.api_root = this.request.server.info.uri
 
     // Start converting.
-    generator.generate()
+    return generator.generate()
       .then(payload => this.response(payload))
-
-    // Return the response object.
-    return this.response
   }
 
   /**
