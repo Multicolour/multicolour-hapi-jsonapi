@@ -42,6 +42,6 @@
   "dependencies": {
     "joi": "^8.0.3",
     "waterline-joi": "^1.0.12",
-    "waterline-jsonapi": "^0.3.7"
+    "waterline-jsonapi": "^0.3.9"
   }
 }
