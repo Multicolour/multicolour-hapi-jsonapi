@@ -146,8 +146,18 @@ class Multicolour_Hapi_JSONAPI extends Map {
         // Route those relationships.
         const relationships_full =
           model_relationships.map(relationship_name => {
+            // Get the collection.
+            const collection = relationship_to[relationship_name]
+
+            // What key will we query for?
             let query_key = model._attributes[relationship_name].model ? "id" : name
 
+            // Check the target collection has that association.
+            // if (!collection._attributes.hasOwnProperty(name)) {
+            //   return false
+            // }
+
+            // Return the route.
             return {
               method: "GET",
               path: `/${name}/{${query_key}}/${relationship_name}`,
@@ -157,19 +167,33 @@ class Multicolour_Hapi_JSONAPI extends Map {
                   // Merge the params into the query string params.
                   request.url.query = extend(request.url.query, request.params)
 
-                  // Call the handler.
-                  if (query_key === "id") {
-                    return relationship_to[relationship_name]
-                      .find({ [name]: request.params[query_key] })
-                      .populateAll()
-                      .exec((err, models) =>
-                        reply[request.headers.accept](models.map(model => model.toJSON()), relationship_to[relationship_name]))
-                  }
-                  else {
-                    return handlers.GET.call(relationship_to[relationship_name], request, (err, models) =>
-                      reply[request.headers.accept](err || models, relationship_to[relationship_name])
-                    )
-                  }
+                  // Get the records.
+                  model
+                    .findOne({ id: request.params[query_key] })
+                    .exec((err, model) => {
+                      if (err) {
+                        reply[request.headers.accept](err, collection)
+                      }
+                      else if (!model) {
+                        reply[request.headers.accept](null, collection)
+                      }
+                      else {
+                        collection
+                          .find({ id: model[relationship_name] })
+                          .populateAll()
+                          .exec((err, models) => {
+                            if (err) {
+                              reply[request.headers.accept](err, collection)
+                            }
+                            else if (!models) {
+                              reply[request.headers.accept](null, collection)
+                            }
+                            else {
+                              reply[request.headers.accept](models.map(model => model.toJSON()), collection)
+                            }
+                          })
+                      }
+                    })
                 },
                 description: `Get ${relationship_name} related to ${name}.`,
                 notes: `Get ${relationship_name} related to ${name}.`,
@@ -181,16 +205,25 @@ class Multicolour_Hapi_JSONAPI extends Map {
                   })
                 },
                 response: {
-                  schema: this.get_response_schemas(multicolour.get("server").get("validators"), relationship_to[relationship_name])
+                  schema: this.get_response_schemas(multicolour.get("server").get("validators"), collection)
                       .meta({ className: `related_${relationship_name}` })
                 }
               }
             }
           })
+          .filter(route => !!route)
 
         // Route those relationships.
         const relationship_object =
           model_relationships.map(relationship_name => {
+            // Get the collection.
+            const collection = relationship_to[relationship_name]
+
+            // Check the target collection has that association.
+            if (!relationship_to[relationship_name]._attributes.hasOwnProperty(name)) {
+              return false
+            }
+
             let query_key = model._attributes[relationship_name].model ? "id" : name
 
             return {
@@ -212,35 +245,33 @@ class Multicolour_Hapi_JSONAPI extends Map {
                   // Merge the params into the query string params.
                   request.url.query = extend(request.url.query, request.params)
 
-                  // Call the handler.
-                  if (query_key === "id") {
-                    return handlers.GET.call(model, request, (err, models) => {
+                  // Get the records.
+                  model
+                    .findOne({ id: request.params[query_key] })
+                    .exec((err, model) => {
                       if (err) {
-                        /* istanbul ignore next */
-                        reply[method](err, model, meta)
+                        reply[request.headers.accept](err, collection)
+                      }
+                      else if (!model) {
+                        reply[request.headers.accept](null, collection)
                       }
                       else {
-                        // Get the ids of the related models.
-                        const ids = models.map(model => model[relationship_name] && model[relationship_name].id)
-
-                        // Get them.
-                        relationship_to[relationship_name]
-                          .find({ [name]: ids }, { fields: ["id", name] })
-                          .populateAll()
+                        collection
+                          .find({ id: model[relationship_name] }, { fields: { id: 1, name: 1 } })
                           .exec((err, models) => {
-                            reply[method](models.map(model => model.toJSON()), relationship_to[relationship_name], meta)
+                            console.log(models)
+                            if (err) {
+                              reply[request.headers.accept](err, collection)
+                            }
+                            else if (!models) {
+                              reply[request.headers.accept](null, collection)
+                            }
+                            else {
+                              reply[request.headers.accept](models.map(model => model.toJSON()), collection, { is_relationships: true })
+                            }
                           })
                       }
                     })
-                  }
-                  else {
-                    relationship_to[relationship_name]
-                      .find({ [name]: request.params[name] }, { fields: ["id", name] })
-                      .populateAll()
-                      .exec((err, models) =>{
-                        reply[method](models.map(model => model.toJSON()), relationship_to[relationship_name], meta)
-                      })
-                  }
                 },
                 description: `Get ${relationship_name} related to ${name}.`,
                 notes: `Get ${relationship_name} related to ${name}.`,
@@ -252,11 +283,12 @@ class Multicolour_Hapi_JSONAPI extends Map {
                   })
                 },
                 response: {
-                  schema: this.get_related_schema().meta({ className: `related_${relationship_name}` })
+                  // schema: this.get_related_schema().meta({ className: `related_${relationship_name}` })
                 }
               }
             }
           })
+          .filter(route => !!route)
 
         // Route the relationship entities.
         server.route(relationships_full)
@@ -279,10 +311,13 @@ class Multicolour_Hapi_JSONAPI extends Map {
       type: joi.string().required()
     })
 
-    return joi.object({
-      links: this.get_links_schema(),
-      data: joi.alternatives().try(joi.array().items(data), data)
-    })
+    return joi.alternatives().try(
+      this.get_error_schema(),
+      joi.object({
+        links: this.get_links_schema(),
+        data: joi.alternatives().try(joi.array().items(data), data)
+      })
+    )
   }
 
   /**
@@ -318,7 +353,8 @@ class Multicolour_Hapi_JSONAPI extends Map {
         links: this.get_links_schema(),
         data: joi.alternatives().try(
           joi.array().items(data_payload),
-          data_payload
+          data_payload,
+          joi.allow(null)
         ),
         included: joi.array()
       }),
@@ -373,7 +409,19 @@ class Multicolour_Hapi_JSONAPI extends Map {
 
     // Start converting.
     return generator.generate()
+      .then(payload => {console.log("PAYLOAD", payload); return payload})
       .then(payload => this.response(payload))
+      .catch(error => {
+        this.response({
+          errors: {
+            detail: error.message,
+            source: error.stack,
+            status: "500"
+          }
+        }).code(500)
+
+        console.error(error.message, error.stack)
+      })
   }
 
   /**
