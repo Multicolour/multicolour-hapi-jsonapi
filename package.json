@@ -45,8 +45,7 @@
     "joi": "^8.0.3",
     "snyk": "^1.13.2",
     "waterline-joi": "^1.0.12",
-    "waterline-jsonapi": "^0.3.9"
-  }
+    "waterline-jsonapi": "^0.3.10"
   },
   "snyk": true
 }
