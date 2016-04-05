@@ -4,8 +4,10 @@
   "description": "JSON API reply decorator built on Waterline and waterline-jsonapi",
   "main": "index.js",
   "scripts": {
-    "test": "tape tests/*.js | tap-spec",
-    "test-coverage": "istanbul cover tape tests/*.js --recursive --report lcov html -x handlers.js | tap-spec"
+    "test": "snyk test && tape tests/*.js | tap-spec",
+    "test-coverage": "istanbul cover tape tests/*.js --recursive --report lcov html -x handlers.js | tap-spec",
+    "snyk-protect": "snyk protect",
+    "prepublish": "npm run snyk-protect"
   },
   "repository": {
     "type": "git",
@@ -41,7 +43,10 @@
   },
   "dependencies": {
     "joi": "^8.0.3",
+    "snyk": "^1.13.2",
     "waterline-joi": "^1.0.12",
     "waterline-jsonapi": "^0.3.9"
   }
+  },
+  "snyk": true
 }
