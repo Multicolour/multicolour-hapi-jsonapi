@@ -409,7 +409,6 @@ class Multicolour_Hapi_JSONAPI extends Map {
 
     // Start converting.
     return generator.generate()
-      .then(payload => {console.log("PAYLOAD", payload); return payload})
       .then(payload => this.response(payload))
       .catch(error => {
         this.response({
