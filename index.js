@@ -25,6 +25,10 @@ class Multicolour_Hapi_JSONAPI extends Map {
     // Set the defaults.
     this.set("multicolour", generator.request("host"))
 
+    const settings = this.get("multicolour").get("config").get("settings") || {}
+    const configured_prefix = settings.route_prefix
+    this.set("prefix", configured_prefix.endsWith("/") ? configured_prefix.slice(0, -1) : configured_prefix)
+
     return this
   }
 
@@ -152,15 +156,10 @@ class Multicolour_Hapi_JSONAPI extends Map {
             // What key will we query for?
             let query_key = model._attributes[relationship_name].model ? "id" : name
 
-            // Check the target collection has that association.
-            // if (!collection._attributes.hasOwnProperty(name)) {
-            //   return false
-            // }
-
             // Return the route.
             return {
               method: "GET",
-              path: `/${name}/{${query_key}}/${relationship_name}`,
+              path: `${this.get("prefix")}/${name}/{${query_key}}/${relationship_name}`,
               config: {
                 auth: this.get_auth_config(model, multicolour.get("server").request("auth_config")),
                 handler: (request, reply) => {
@@ -228,7 +227,7 @@ class Multicolour_Hapi_JSONAPI extends Map {
 
             return {
               method: "GET",
-              path: `/${name}/{${query_key}}/relationships/${relationship_name}`,
+              path: `${this.get("prefix")}/${name}/{${query_key}}/relationships/${relationship_name}`,
               config: {
                 auth: this.get_auth_config(model, multicolour.get("server").request("auth_config")),
                 handler: (request, reply) => {
