@@ -26,7 +26,7 @@ class Multicolour_Hapi_JSONAPI extends Map {
     this.set("multicolour", generator.request("host"))
 
     const settings = this.get("multicolour").get("config").get("settings") || {}
-    const configured_prefix = settings.route_prefix
+    const configured_prefix = settings.route_prefix || ""
     this.set("prefix", configured_prefix.endsWith("/") ? configured_prefix.slice(0, -1) : configured_prefix)
 
     return this
