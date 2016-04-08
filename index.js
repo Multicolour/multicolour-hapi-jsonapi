@@ -148,150 +148,158 @@ class Multicolour_Hapi_JSONAPI extends Map {
         })
 
         // Route those relationships.
-        const relationships_full =
-          model_relationships.map(relationship_name => {
-            // Get the collection.
-            const collection = relationship_to[relationship_name]
+        model_relationships.forEach(relationship_name => {
+          // Get the collection.
+          const collection = relationship_to[relationship_name]
 
-            // What key will we query for?
-            let query_key = model._attributes[relationship_name].model ? "id" : name
+          // What key will we query for?
+          let query_key = model._attributes[relationship_name].model ? "id" : name
 
-            // Return the route.
-            return {
-              method: "GET",
-              path: `${this.get("prefix")}/${name}/{${query_key}}/${relationship_name}`,
-              config: {
-                auth: this.get_auth_config(model, multicolour.get("server").request("auth_config")),
-                handler: (request, reply) => {
-                  // Merge the params into the query string params.
-                  request.url.query = extend(request.url.query, request.params)
+          // Create the path
+          const path = `${this.get("prefix")}/${name}/{${query_key}}/${relationship_name}`
 
-                  // Get the records.
-                  model
-                    .findOne({ id: request.params[query_key] })
-                    .exec((err, model) => {
-                      if (err) {
-                        reply[request.headers.accept](err, collection)
-                      }
-                      else if (!model) {
-                        reply[request.headers.accept](null, collection)
-                      }
-                      else {
-                        collection
-                          .find({ id: model[relationship_name] })
-                          .populateAll()
-                          .exec((err, models) => {
-                            if (err) {
-                              reply[request.headers.accept](err, collection)
-                            }
-                            else if (!models) {
-                              reply[request.headers.accept](null, collection)
-                            }
-                            else {
-                              reply[request.headers.accept](models.map(model => model.toJSON()), collection)
-                            }
-                          })
-                      }
-                    })
-                },
-                description: `Get ${relationship_name} related to ${name}.`,
-                notes: `Get ${relationship_name} related to ${name}.`,
-                tags: ["api", "relationships"],
-                validate: {
-                  headers,
-                  params: joi.object({
-                    [query_key]: joi.string().required()
+          // Check we didn't already register a route here.
+          if (server.match("GET", path)) {
+            return false
+          }
+
+          // Return the route.
+          server.route({
+            method: "GET",
+            path,
+            config: {
+              auth: this.get_auth_config(model, multicolour.get("server").request("auth_config")),
+              handler: (request, reply) => {
+                // Merge the params into the query string params.
+                request.url.query = extend(request.url.query, request.params)
+
+                // Get the records.
+                model
+                  .findOne({ id: request.params[query_key] })
+                  .exec((err, model) => {
+                    if (err) {
+                      reply[request.headers.accept](err, collection)
+                    }
+                    else if (!model) {
+                      reply[request.headers.accept](null, collection)
+                    }
+                    else {
+                      collection
+                        .find({ id: model[relationship_name] })
+                        .populateAll()
+                        .exec((err, models) => {
+                          if (err) {
+                            reply[request.headers.accept](err, collection)
+                          }
+                          else if (!models) {
+                            reply[request.headers.accept](null, collection)
+                          }
+                          else {
+                            reply[request.headers.accept](models.map(model => model.toJSON()), collection)
+                          }
+                        })
+                    }
                   })
-                },
-                response: {
-                  schema: this.get_response_schemas(multicolour.get("server").get("validators"), collection)
-                      .meta({ className: `related_${relationship_name}` })
-                }
+              },
+              description: `Get ${relationship_name} related to ${name}.`,
+              notes: `Get ${relationship_name} related to ${name}.`,
+              tags: ["api", "relationships"],
+              validate: {
+                headers,
+                params: joi.object({
+                  [query_key]: joi.string().required()
+                })
+              },
+              response: {
+                schema: this.get_response_schemas(multicolour.get("server").get("validators"), collection)
+                    .meta({ className: `related_${relationship_name}` })
               }
             }
           })
-          .filter(route => !!route)
+        })
 
         // Route those relationships.
-        const relationship_object =
-          model_relationships.map(relationship_name => {
-            // Get the collection.
-            const collection = relationship_to[relationship_name]
+        model_relationships.forEach(relationship_name => {
+          // Get the collection.
+          const collection = relationship_to[relationship_name]
 
-            // Check the target collection has that association.
-            if (!relationship_to[relationship_name]._attributes.hasOwnProperty(name)) {
-              return false
-            }
+          // Check the target collection has that association.
+          if (!relationship_to[relationship_name]._attributes.hasOwnProperty(name)) {
+            return false
+          }
 
-            let query_key = model._attributes[relationship_name].model ? "id" : name
+          let query_key = model._attributes[relationship_name].model ? "id" : name
 
-            return {
-              method: "GET",
-              path: `${this.get("prefix")}/${name}/{${query_key}}/relationships/${relationship_name}`,
-              config: {
-                auth: this.get_auth_config(model, multicolour.get("server").request("auth_config")),
-                handler: (request, reply) => {
-                  // Set the meta.
-                  const meta = {
-                    context: "related",
-                    is_relationships: true,
-                    relationships_type_filter: name
-                  }
+          // Create the path.
+          const path = `${this.get("prefix")}/${name}/{${query_key}}/relationships/${relationship_name}`
 
-                  // The decorator method to call.
-                  const method = request.headers.accept
+          // Check we didn't already register a route here.
+          if (server.match("GET", path)) {
+            return false
+          }
 
-                  // Merge the params into the query string params.
-                  request.url.query = extend(request.url.query, request.params)
-
-                  // Get the records.
-                  model
-                    .findOne({ id: request.params[query_key] })
-                    .exec((err, model) => {
-                      if (err) {
-                        reply[request.headers.accept](err, collection)
-                      }
-                      else if (!model) {
-                        reply[request.headers.accept](null, collection)
-                      }
-                      else {
-                        collection
-                          .find({ id: model[relationship_name] }, { fields: { id: 1, name: 1 } })
-                          .exec((err, models) => {
-                            console.log(models)
-                            if (err) {
-                              reply[request.headers.accept](err, collection)
-                            }
-                            else if (!models) {
-                              reply[request.headers.accept](null, collection)
-                            }
-                            else {
-                              reply[request.headers.accept](models.map(model => model.toJSON()), collection, { is_relationships: true })
-                            }
-                          })
-                      }
-                    })
-                },
-                description: `Get ${relationship_name} related to ${name}.`,
-                notes: `Get ${relationship_name} related to ${name}.`,
-                tags: ["api", "relationships"],
-                validate: {
-                  headers,
-                  params: joi.object({
-                    [query_key]: joi.string().required()
-                  })
-                },
-                response: {
-                  // schema: this.get_related_schema().meta({ className: `related_${relationship_name}` })
+          server.route({
+            method: "GET",
+            path,
+            config: {
+              auth: this.get_auth_config(model, multicolour.get("server").request("auth_config")),
+              handler: (request, reply) => {
+                // Set the meta.
+                const meta = {
+                  context: "related",
+                  is_relationships: true,
+                  relationships_type_filter: name
                 }
+
+                // The decorator method to call.
+                const method = request.headers.accept
+
+                // Merge the params into the query string params.
+                request.url.query = extend(request.url.query, request.params)
+
+                // Get the records.
+                model
+                  .findOne({ id: request.params[query_key] })
+                  .exec((err, model) => {
+                    if (err) {
+                      reply[request.headers.accept](err, collection)
+                    }
+                    else if (!model) {
+                      reply[request.headers.accept](null, collection)
+                    }
+                    else {
+                      collection
+                        .find({ id: model[relationship_name] }, { fields: { id: 1, name: 1 } })
+                        .exec((err, models) => {
+                          console.log(models)
+                          if (err) {
+                            reply[request.headers.accept](err, collection)
+                          }
+                          else if (!models) {
+                            reply[request.headers.accept](null, collection)
+                          }
+                          else {
+                            reply[request.headers.accept](models.map(model => model.toJSON()), collection, { is_relationships: true })
+                          }
+                        })
+                    }
+                  })
+              },
+              description: `Get ${relationship_name} related to ${name}.`,
+              notes: `Get ${relationship_name} related to ${name}.`,
+              tags: ["api", "relationships"],
+              validate: {
+                headers,
+                params: joi.object({
+                  [query_key]: joi.string().required()
+                })
+              },
+              response: {
+                // schema: this.get_related_schema().meta({ className: `related_${relationship_name}` })
               }
             }
           })
-          .filter(route => !!route)
-
-        // Route the relationship entities.
-        server.route(relationships_full)
-        server.route(relationship_object)
+        })
       })
   }
 
