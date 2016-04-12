@@ -248,7 +248,7 @@ class Multicolour_Hapi_JSONAPI extends Map {
                 const meta = {
                   context: "related",
                   is_relationships: true,
-                  relationships_type_filter: name
+                  relationships_type_filter: collection.adapter.identity
                 }
 
                 // The decorator method to call.
@@ -262,24 +262,23 @@ class Multicolour_Hapi_JSONAPI extends Map {
                   .findOne({ id: request.params[query_key] })
                   .exec((err, model) => {
                     if (err) {
-                      reply[request.headers.accept](err, collection)
+                      reply[method](err, collection)
                     }
                     else if (!model) {
-                      reply[request.headers.accept](null, collection)
+                      reply[method](null, collection)
                     }
                     else {
                       collection
                         .find({ [name]: model.id }, { fields: { id: 1, name: 1, [name]: 1 } })
                         .exec((err, models) => {
-                          console.log(models)
                           if (err) {
-                            reply[request.headers.accept](err, collection)
+                            reply[method](err, collection)
                           }
                           else if (!models) {
-                            reply[request.headers.accept](null, collection)
+                            reply[method](null, collection)
                           }
                           else {
-                            reply[request.headers.accept](models.map(model => model.toJSON()), collection, { is_relationships: true })
+                            reply[method](models.map(model => model.toJSON()), collection, meta)
                           }
                         })
                     }
