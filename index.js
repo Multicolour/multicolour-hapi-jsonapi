@@ -185,7 +185,7 @@ class Multicolour_Hapi_JSONAPI extends Map {
                     }
                     else {
                       collection
-                        .find({ id: model[relationship_name] })
+                        .find({ [name]: model.id })
                         .populateAll()
                         .exec((err, models) => {
                           if (err) {
@@ -269,7 +269,7 @@ class Multicolour_Hapi_JSONAPI extends Map {
                     }
                     else {
                       collection
-                        .find({ id: model[relationship_name] }, { fields: { id: 1, name: 1 } })
+                        .find({ [name]: model.id }, { fields: { id: 1, name: 1, [name]: 1 } })
                         .exec((err, models) => {
                           console.log(models)
                           if (err) {
