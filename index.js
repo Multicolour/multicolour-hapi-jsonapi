@@ -413,20 +413,27 @@ class Multicolour_Hapi_JSONAPI extends Map {
     // Add the API root url to the generator.
     generator.api_root = this.request.server.info.uri
 
-    // Start converting.
-    return generator.generate()
-      .then(payload => this.response(payload))
-      .catch(error => {
-        this.response({
-          errors: {
-            detail: error.message,
-            source: error.stack,
-            status: "500"
-          }
-        }).code(500)
+    let payload
 
-        console.error(error.message, error.stack)
-      })
+    // Start converting.
+    try {
+      payload = generator.generate()
+    }
+    catch (error) {
+      return this.response({
+        errors: {
+          detail: error.message,
+          source: error.stack,
+          status: "500"
+        }
+      }).code(500)
+
+      /* eslint-disable */
+      console.error(error.message, error.stack)
+      /* eslint-enable */
+    }
+
+    return this.response(payload)
   }
 
   /**
