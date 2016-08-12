@@ -446,6 +446,9 @@ class Multicolour_Hapi_JSONAPI extends Map {
     const server = Multicolour_Server_Hapi.request("raw")
     const header_validator = Multicolour_Server_Hapi.request("header_validator")
 
+    // Set a new default decorator.
+    multicolour.reply("decorator", CN_NAME)
+
     // We need the host setting on the handlers
     // so that they can fetch various models.
     handlers.set_host(multicolour)
