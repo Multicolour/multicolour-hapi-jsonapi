@@ -29,7 +29,35 @@ class Multicolour_Hapi_JSONAPI extends Map {
     const configured_prefix = settings.route_prefix || ""
     this.set("prefix", configured_prefix.endsWith("/") ? configured_prefix.slice(0, -1) : configured_prefix)
 
+    // Generate all the schemas used by the validator.
+    this.schemas = this.generate_all_model_schemas()
+    this.error_schema = this.get_error_schema()
+
     return this
+  }
+
+  generate_all_model_schemas() {
+    const schemas = {
+      post: {},
+      get: {},
+      put: {},
+      patch: {},
+      delete: {}
+    }
+    const multicolour = this.get("multicolour")
+    const models = multicolour.get("database").get("definitions")
+
+    Object.keys(models)
+      .forEach(model_name => {
+        const write_schema = this.get_payload_schema(models[model_name])
+
+        schemas.get[model_name] = this.get_response_schema(models[model_name])
+        schemas.post[model_name] = write_schema
+        schemas.put[model_name] = write_schema
+        schemas.patch[model_name] = write_schema
+      })
+
+    return schemas
   }
 
   /**
@@ -68,14 +96,35 @@ class Multicolour_Hapi_JSONAPI extends Map {
    * @return {Array} array of joi schemas.
    */
   get_response_schemas(validators, collection) {
-    // Used in an .apply later.
-    const response_alternatives = joi.alternatives()
+    const attributes = Object.assign({}, collection.attributes || collection._attributes)
+    delete attributes.id
 
-    // Return the schemas.
-    return response_alternatives.try.apply(
-      response_alternatives,
-      validators.map(validator => validator.get_response_schema(collection))
-    )
+    let collection_data = {
+      type: collection.adapter.identity,
+      id: joi.alternatives().try(joi.string(), joi.number()),
+      attributes: waterline_joi(attributes)
+    }
+
+    const relationships = {}
+    const included = []
+
+    // Make it a joi object.
+    collection_data = joi.object(collection_data)
+
+    // Create the basic
+    const out = {
+      links: joi.object({
+        self: joi.string().uri(),
+        next: joi.string().uri(),
+        last: joi.string().uri()
+      }),
+      data: joi.alternatives().try(collection_data, joi.array().items(collection_data)),
+      relationships: joi.object(relationships),
+      included: joi.array().items(included)
+    }
+
+
+    return joi.object(out)
   }
 
   get_error_schema() {
@@ -119,7 +168,7 @@ class Multicolour_Hapi_JSONAPI extends Map {
 
     // Get the headers.
     const headers = joi.object(multicolour.request("header_validator").get())
-      .options({ allowUnknown: true })
+      .options({allowUnknown: true})
 
     models
       // Don't do any generation for models that
@@ -136,13 +185,17 @@ class Multicolour_Hapi_JSONAPI extends Map {
 
         // Get any relationships this model has.
         const model_relationships = Object.keys(attributes)
-          .filter(attribute_name => model._attributes[attribute_name].model || model._attributes[attribute_name].collection)
+          .filter(attribute_name =>
+            model._attributes[attribute_name].model ||
+            model._attributes[attribute_name].collection
+          )
 
         // Maps the relationship name back to the relevant
         // model in the collections array.
         const relationship_to = {}
         model_relationships.forEach(relationship_name => {
-          const related_model = collections[model._attributes[relationship_name].model || model._attributes[relationship_name].collection]
+          const related_model = collections[model._attributes[relationship_name].model ||
+            model._attributes[relationship_name].collection]
 
           relationship_to[relationship_name] = related_model
         })
@@ -173,29 +226,32 @@ class Multicolour_Hapi_JSONAPI extends Map {
                 // Merge the params into the query string params.
                 request.url.query = extend(request.url.query, request.params)
 
+                // Get the response function.
+                const respond = reply[request.headers.accept]
+
                 // Get the records.
                 model
-                  .findOne({ id: request.params[query_key] })
+                  .findOne({id: request.params[query_key]})
                   .exec((err, model) => {
                     if (err) {
-                      reply[request.headers.accept](err, collection)
+                      respond(err, collection)
                     }
                     else if (!model) {
-                      reply[request.headers.accept](null, collection)
+                      respond(null, collection)
                     }
                     else {
                       collection
-                        .find({ [name]: model.id })
+                        .find({[name]: model.id})
                         .populateAll()
                         .exec((err, models) => {
                           if (err) {
-                            reply[request.headers.accept](err, collection)
+                            respond(err, collection)
                           }
                           else if (!models) {
-                            reply[request.headers.accept](null, collection)
+                            respond(null, collection)
                           }
                           else {
-                            reply[request.headers.accept](models.map(model => model.toJSON()), collection)
+                            respond(models.map(model => model.toJSON()), collection)
                           }
                         })
                     }
@@ -211,8 +267,8 @@ class Multicolour_Hapi_JSONAPI extends Map {
                 })
               },
               response: {
-                schema: this.get_response_schemas(multicolour.get("server").get("validators"), collection)
-                    .meta({ className: `related_${relationship_name}` })
+                schema: this.get_response_schemas(multicolour.get("validators"), collection)
+                    .meta({className: `related_${relationship_name}`})
               }
             }
           })
@@ -259,7 +315,7 @@ class Multicolour_Hapi_JSONAPI extends Map {
 
                 // Get the records.
                 model
-                  .findOne({ id: request.params[query_key] })
+                  .findOne({id: request.params[query_key]})
                   .exec((err, model) => {
                     if (err) {
                       reply[method](err, collection)
@@ -269,7 +325,7 @@ class Multicolour_Hapi_JSONAPI extends Map {
                     }
                     else {
                       collection
-                        .find({ [name]: model.id }, { fields: { id: 1, name: 1, [name]: 1 } })
+                        .find({[name]: model.id}, {fields: {id: 1, name: 1, [name]: 1}})
                         .exec((err, models) => {
                           if (err) {
                             reply[method](err, collection)
@@ -333,7 +389,7 @@ class Multicolour_Hapi_JSONAPI extends Map {
    */
   get_response_schema(collection) {
     // Clone the attributes.
-    const attributes = utils.clone_attributes(collection._attributes)
+    const attributes = utils.clone_attributes(collection._attributes || collection.attributes)
 
     // Get the model since we're going to rid of the `id` attribute.
     const model = utils.check_and_fix_associations(attributes, "object")
@@ -351,23 +407,17 @@ class Multicolour_Hapi_JSONAPI extends Map {
       links: joi.object()
     })
 
-    // This is an `alternatives` because entities may,
-    // or may not be a singular and there might have
-    // been an error.
-    return joi.alternatives().try(
-      joi.object({
-        links: this.get_links_schema(),
-        data: joi.alternatives().try(
-          joi.array().items(data_payload),
-          data_payload,
-          joi.allow(null)
-        ),
-        included: joi.array()
-      }),
-      joi.object({
-        errors: joi.alternatives().try(joi.array().items(joi.object()), joi.object())
-      })
-    )
+    console.log("DATA PAYLOAD", JSON.stringify(data_payload, null, 2))
+
+    return joi.object({
+      links: this.get_links_schema(),
+      data: joi.alternatives().try(
+        joi.array().items(data_payload),
+        data_payload,
+        joi.allow(null)
+      ),
+      included: joi.array()
+    })
   }
 
   /**
@@ -376,14 +426,16 @@ class Multicolour_Hapi_JSONAPI extends Map {
    * @return {Joi.Schema} Schema for any requests.
    */
   get_payload_schema(collection) {
+    const target = collection._attributes || collection.attributes
+
     // Get our tools.
-    const attributes = utils.clone_attributes(collection._attributes)
+    const attributes = utils.clone_attributes(target)
 
     // Extend our attributes over some Waterline defaults.
     extend({
-      id: collection._attributes.id,
-      createdAt: collection._attributes.createdAt,
-      updatedAt: collection._attributes.updatedAt
+      id: target.id,
+      createdAt: target.createdAt,
+      updatedAt: target.updatedAt
     }, attributes)
 
     // Return the schema.
@@ -454,7 +506,7 @@ class Multicolour_Hapi_JSONAPI extends Map {
     handlers.set_host(multicolour)
 
     // Add this validator to the list.
-    Multicolour_Server_Hapi.get("validators").push(this)
+    multicolour.get("validators").set(CN_NAME, this)
 
     // Update the accept header to the one in the spec.
     header_validator.set("accept", header_validator.get("accept")
