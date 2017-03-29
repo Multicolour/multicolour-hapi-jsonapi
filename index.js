@@ -4,7 +4,6 @@
 const joi = require("joi")
 const extend = require("util")._extend
 const waterline_joi = require("waterline-joi")
-const handlers = require("multicolour/lib/handlers")
 const utils = require("./utils")
 const Waterline_JSONAPI = require("waterline-jsonapi")
 
@@ -407,8 +406,6 @@ class Multicolour_Hapi_JSONAPI extends Map {
       links: joi.object()
     })
 
-    console.log("DATA PAYLOAD", JSON.stringify(data_payload, null, 2))
-
     return joi.object({
       links: this.get_links_schema(),
       data: joi.alternatives().try(
@@ -500,10 +497,6 @@ class Multicolour_Hapi_JSONAPI extends Map {
 
     // Set a new default decorator.
     multicolour.reply("decorator", CN_NAME)
-
-    // We need the host setting on the handlers
-    // so that they can fetch various models.
-    handlers.set_host(multicolour)
 
     // Add this validator to the list.
     multicolour.get("validators").set(CN_NAME, this)
