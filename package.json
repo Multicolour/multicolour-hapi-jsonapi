@@ -31,21 +31,21 @@
     "node": ">= 4.0.0"
   },
   "devDependencies": {
-    "eslint": "^2.7.0",
-    "istanbul": "^0.4.3",
-    "joi": "^8.0.5",
-    "multicolour": "^0.3.4",
+    "eslint": "^3.18.0",
+    "istanbul": "^0.4.5",
+    "joi": "^10.3.1",
+    "multicolour": "^0.6.4",
     "multicolour-seed": "0.0.6",
-    "multicolour-server-hapi": "^1.3.2",
-    "sails-memory": "^0.10.6",
+    "multicolour-server-hapi": "^1.7.6",
+    "sails-memory": "^0.10.7",
     "tap-spec": "^4.1.1",
-    "tape": "^4.5.1"
+    "tape": "^4.6.3"
   },
   "dependencies": {
     "joi": "^8.0.3",
-    "snyk": "^1.13.2",
-    "waterline-joi": "^1.0.12",
-    "waterline-jsonapi": "^0.3.18"
+    "snyk": "^1.26.0",
+    "waterline-joi": "^1.1.1",
+    "waterline-jsonapi": "^0.3.21"
   },
   "snyk": true
 }

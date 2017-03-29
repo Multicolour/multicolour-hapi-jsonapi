@@ -1,11 +1,14 @@
+# Snyk (https://snyk.io) policy file, patches or ignores known vulnerabilities.
+# patches apply the minimum changes required to fix a vulnerability
 patch:
   'npm:moment:20160126':
-    - 'hapi > catbox > joi > moment':
+    - hapi > catbox > joi > moment:
         patched: '2016-04-05T07:17:30.369Z'
-    - 'hapi > heavy > joi > moment':
+    - hapi > heavy > joi > moment:
         patched: '2016-04-05T07:17:30.369Z'
-    - 'hapi > joi > moment':
+    - hapi > joi > moment:
         patched: '2016-04-05T07:17:30.369Z'
-    - 'hapi > statehood > joi > moment':
+    - hapi > statehood > joi > moment:
         patched: '2016-04-05T07:17:30.369Z'
-version: v1
+version: v1.7.0
+ignore: {}
