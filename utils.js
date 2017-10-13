@@ -5,7 +5,7 @@
  * @param  {Object} attributes to clone.
  * @return {Object} cloned object.
  */
-const clone_attributes = attributes => JSON.parse(JSON.stringify(attributes))
+const clone_attributes = attributes => Object.assign({}, attributes)
 
 /**
  * Check over the associations in the collection
