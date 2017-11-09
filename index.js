@@ -267,7 +267,7 @@ class Multicolour_Hapi_JSONAPI extends Map {
               },
               response: {
                 schema: this.get_response_schemas(multicolour.get("validators"), collection)
-                    .meta({className: `related_${relationship_name}`})
+                  .meta({className: `related_${relationship_name}`})
               }
             }
           })
@@ -283,7 +283,8 @@ class Multicolour_Hapi_JSONAPI extends Map {
             return false
           }
 
-          let query_key = model._attributes[relationship_name].model ? "id" : name
+          // What key will we query for?
+          let query_key = (model._attributes[relationship_name].model ? "id" : name).replace(/-/g, "_")
 
           // Create the path.
           const path = `${this.get("prefix")}/${name}/{${query_key}}/relationships/${relationship_name}`
