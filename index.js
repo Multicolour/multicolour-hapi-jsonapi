@@ -180,7 +180,7 @@ class Multicolour_Hapi_JSONAPI extends Map {
         const attributes = utils.clone_attributes(model._attributes)
 
         // Save typing later.
-        const name = model.adapter.identity
+        const name = model.adapter.identity.replace(/-/g, "_")
 
         // Get any relationships this model has.
         const model_relationships = Object.keys(attributes)
