@@ -48,6 +48,13 @@ class Multicolour_Hapi_JSONAPI extends Map {
 
     Object.keys(models)
       .forEach(model_name => {
+        if (!models.hasOwnProperty(model_name) || Object.keys(models[model_name]).length === 0)
+          throw new ReferenceError(`
+            A model tried to relate to another incorrectly, cannot reconcile this. The target relationship is with ${model_name}.
+
+            This could be a file inside of content/blueprints that isn't a JavaScript file or valid blueprint definition.
+          `)
+
         const write_schema = this.get_payload_schema(models[model_name])
 
         schemas.get[model_name] = this.get_response_schema(models[model_name])
