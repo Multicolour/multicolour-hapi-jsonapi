@@ -48,13 +48,6 @@ class Multicolour_Hapi_JSONAPI extends Map {
 
     Object.keys(models)
       .forEach(model_name => {
-        if (!models.hasOwnProperty(model_name) || Object.keys(models[model_name]).length === 0)
-          throw new ReferenceError(`
-            A model tried to relate to another incorrectly, cannot reconcile this. The target relationship is with ${model_name}.
-
-            This could be a file inside of content/blueprints that isn't a JavaScript file or valid blueprint definition.
-          `)
-
         const write_schema = this.get_payload_schema(models[model_name])
 
         schemas.get[model_name] = this.get_response_schema(models[model_name])
@@ -118,7 +111,7 @@ class Multicolour_Hapi_JSONAPI extends Map {
     collection_data = joi.object(collection_data)
 
     // Create the basic
-    const out = {
+    const out = joi.object({
       links: joi.object({
         self: joi.string().uri(),
         next: joi.string().uri(),
@@ -127,10 +120,13 @@ class Multicolour_Hapi_JSONAPI extends Map {
       data: joi.alternatives().try(collection_data, joi.array().items(collection_data)),
       relationships: joi.object(relationships),
       included: joi.array().items(included)
-    }
+    })
 
 
-    return joi.object(out)
+    return joi.alternatives().try(
+      out,
+      this.get_error_schema(),
+    )
   }
 
   get_error_schema() {
@@ -139,8 +135,8 @@ class Multicolour_Hapi_JSONAPI extends Map {
       links: joi.object({
         about: joi.string()
       }),
-      status: joi.string().regex(/[0-9]/g),
-      code: joi.string().regex(/[0-9]/g),
+      status: joi.number(),
+      code: joi.string(),
       title: joi.string(),
       detail: joi.string(),
       source: joi.object({
@@ -184,7 +180,7 @@ class Multicolour_Hapi_JSONAPI extends Map {
       .forEach(model => {
         // Clone the attributes to prevent
         // any accidental overriding/side affects.
-        const attributes = utils.clone_attributes(model._attributes)
+        const attributes = utils.clone_attributes(model._attributes || model.attributes)
 
         // Save typing later.
         const name = model.adapter.identity.replace(/-/g, "_")
@@ -233,11 +229,14 @@ class Multicolour_Hapi_JSONAPI extends Map {
                 request.url.query = extend(request.url.query, request.params)
 
                 // Get the response function.
-                const respond = reply[request.headers.accept]
+                const respond = reply[CN_NAME].bind(reply)
+
+                const get_relationship_name_values = (objects) => objects.map(object => object.id)
 
                 // Get the records.
                 model
-                  .findOne({id: request.params[query_key]})
+                  .findOne({ id: request.params[query_key] })
+                  .populateAll()
                   .exec((err, model) => {
                     if (err) {
                       respond(err, collection)
@@ -246,20 +245,16 @@ class Multicolour_Hapi_JSONAPI extends Map {
                       respond(null, collection)
                     }
                     else {
-                      collection
-                        .find({[name]: model.id})
-                        .populateAll()
-                        .exec((err, models) => {
-                          if (err) {
-                            respond(err, collection)
-                          }
-                          else if (!models) {
-                            respond(null, collection)
-                          }
-                          else {
-                            respond(models.map(model => model.toJSON()), collection)
-                          }
-                        })
+                      const values = model[relationship_name]
+
+                      if (process.env.NODE_ENV === "development") {
+                        console.log("Going to run a query on '%s', where {id: %s} and the association is named %s", collection.adapter.identity, values, relationship_name)
+                        console.log("the value was", model)
+                        console.log("original query values", values)
+                      }
+
+                      
+                      respond(values, collection)
                     }
                   })
               },
@@ -414,7 +409,7 @@ class Multicolour_Hapi_JSONAPI extends Map {
       links: joi.object()
     })
 
-    return joi.object({
+    const payload_object = joi.object({
       links: this.get_links_schema(),
       data: joi.alternatives().try(
         joi.array().items(data_payload),
@@ -423,6 +418,11 @@ class Multicolour_Hapi_JSONAPI extends Map {
       ),
       included: joi.array()
     })
+    
+    return joi.alternatives().try(
+      payload_object,
+      this.get_error_schema(),
+    )
   }
 
   /**
@@ -456,12 +456,9 @@ class Multicolour_Hapi_JSONAPI extends Map {
   generate_payload(results, collection, meta) {
     // Check for ambiguity.
     if (!results || !collection) {
-      throw new ReferenceError(`
-        generate_payload called without results or collection
-
-        results: ${typeof results}
-        collection: ${typeof collection}
-      `)
+      return this.response({
+        data: [],
+      })
     }
 
     // Check if it's an error.
@@ -477,6 +474,7 @@ class Multicolour_Hapi_JSONAPI extends Map {
       payload = generator.generate()
     }
     catch (error) {
+      console.error(error)
       return this.response({
         errors: {
           detail: error.message,
