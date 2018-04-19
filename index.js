@@ -29,10 +29,26 @@ class Multicolour_Hapi_JSONAPI extends Map {
     this.set("prefix", configured_prefix.endsWith("/") ? configured_prefix.slice(0, -1) : configured_prefix)
 
     // Generate all the schemas used by the validator.
-    this.schemas = this.generate_all_model_schemas()
-    this.error_schema = this.get_error_schema()
+    this.get("multicolour").on("database_started", () => {
+      this.schemas = this.generate_all_model_schemas()
+      this.error_schema = this.get_error_schema()
+    })
 
     return this
+  }
+
+  optionalise_keys_of_joi_object(joi_object) {
+    return Object.keys(joi_object)
+      .reduce((out, column) => {
+        const column_data = joi_object[column]
+
+        // If it's a joi thing, it's not a relationship.
+        if (column_data.isJoi)
+          out[column] = column_data.optional()
+        else
+          out[column] = this.optionalise_keys_of_joi_object(column_data)
+        return out
+      }, {})
   }
 
   generate_all_model_schemas() {
@@ -44,16 +60,19 @@ class Multicolour_Hapi_JSONAPI extends Map {
       delete: {}
     }
     const multicolour = this.get("multicolour")
-    const models = multicolour.get("database").get("definitions")
+    const db = multicolour.get("database")
+    const models = db.get("definitions")
+    const models_joi = db.raw_waterline_joi_models_related
 
-    Object.keys(models)
+    Object.keys(models_joi)
       .forEach(model_name => {
-        const write_schema = this.get_payload_schema(models[model_name])
+        const joi_model_unwrapped = models_joi[model_name]
+        const joi_model_put_patch = this.optionalise_keys_of_joi_object(joi_model_unwrapped)
 
-        schemas.get[model_name] = this.get_response_schema(models[model_name])
-        schemas.post[model_name] = write_schema
-        schemas.put[model_name] = write_schema
-        schemas.patch[model_name] = write_schema
+        schemas.get[model_name] = this.get_response_schema(joi_model_unwrapped)
+        schemas.post[model_name] = joi.object(joi_model_unwrapped)
+        schemas.put[model_name] = joi.object(joi_model_put_patch)
+        schemas.patch[model_name] = joi.object(joi_model_put_patch)
       })
 
     return schemas
@@ -111,7 +130,7 @@ class Multicolour_Hapi_JSONAPI extends Map {
     collection_data = joi.object(collection_data)
 
     // Create the basic
-    const out = joi.object({
+    const out = {
       links: joi.object({
         self: joi.string().uri(),
         next: joi.string().uri(),
@@ -120,13 +139,10 @@ class Multicolour_Hapi_JSONAPI extends Map {
       data: joi.alternatives().try(collection_data, joi.array().items(collection_data)),
       relationships: joi.object(relationships),
       included: joi.array().items(included)
-    })
+    }
 
 
-    return joi.alternatives().try(
-      out,
-      this.get_error_schema(),
-    )
+    return joi.object(out)
   }
 
   get_error_schema() {
@@ -135,8 +151,8 @@ class Multicolour_Hapi_JSONAPI extends Map {
       links: joi.object({
         about: joi.string()
       }),
-      status: joi.number(),
-      code: joi.string(),
+      status: joi.string().regex(/[0-9]/g),
+      code: joi.string().regex(/[0-9]/g),
       title: joi.string(),
       detail: joi.string(),
       source: joi.object({
@@ -176,11 +192,12 @@ class Multicolour_Hapi_JSONAPI extends Map {
       // Don't do any generation for models that
       // specifically say not to.
       .filter(model => !model.NO_AUTO_GEN_ROUTES)
+
       // All others, start generating.
       .forEach(model => {
         // Clone the attributes to prevent
         // any accidental overriding/side affects.
-        const attributes = utils.clone_attributes(model._attributes || model.attributes)
+        const attributes = utils.clone_attributes(model._attributes)
 
         // Save typing later.
         const name = model.adapter.identity.replace(/-/g, "_")
@@ -229,14 +246,11 @@ class Multicolour_Hapi_JSONAPI extends Map {
                 request.url.query = extend(request.url.query, request.params)
 
                 // Get the response function.
-                const respond = reply[CN_NAME].bind(reply)
-
-                const get_relationship_name_values = (objects) => objects.map(object => object.id)
+                const respond = reply[request.headers.accept]
 
                 // Get the records.
                 model
-                  .findOne({ id: request.params[query_key] })
-                  .populateAll()
+                  .findOne({id: request.params[query_key]})
                   .exec((err, model) => {
                     if (err) {
                       respond(err, collection)
@@ -245,16 +259,20 @@ class Multicolour_Hapi_JSONAPI extends Map {
                       respond(null, collection)
                     }
                     else {
-                      const values = model[relationship_name]
-
-                      if (process.env.NODE_ENV === "development") {
-                        console.log("Going to run a query on '%s', where {id: %s} and the association is named %s", collection.adapter.identity, values, relationship_name)
-                        console.log("the value was", model)
-                        console.log("original query values", values)
-                      }
-
-                      
-                      respond(values, collection)
+                      collection
+                        .find({[name]: model.id})
+                        .populateAll()
+                        .exec((err, models) => {
+                          if (err) {
+                            respond(err, collection)
+                          }
+                          else if (!models) {
+                            respond(null, collection)
+                          }
+                          else {
+                            respond(models.map(model => model.toJSON()), collection)
+                          }
+                        })
                     }
                   })
               },
@@ -386,19 +404,11 @@ class Multicolour_Hapi_JSONAPI extends Map {
 
   /**
    * Get the read only schema for a collection.
-   * @param  {Waterline.Collection} collection to get payload for.
+   * @param  {Object[string = Joi.Schema]} unwrapped Joi schema with all relationships already made.
    * @return {Joi.Schema} Schema for any requests.
    */
-  get_response_schema(collection) {
-    // Clone the attributes.
-    const attributes = utils.clone_attributes(collection._attributes || collection.attributes)
-
-    // Get the model since we're going to rid of the `id` attribute.
-    const model = utils.check_and_fix_associations(attributes, "object")
-    delete model.id
-
-    // Generate a Joi schema from a fixed version of the attributes.
-    const payload = waterline_joi(model)
+  get_response_schema(joi_schema_unwrapped) {
+    const payload = joi.object(joi_schema_unwrapped)
 
     // Generate the `data` payload schema.
     const data_payload = joi.object({
@@ -409,7 +419,7 @@ class Multicolour_Hapi_JSONAPI extends Map {
       links: joi.object()
     })
 
-    const payload_object = joi.object({
+    return joi.object({
       links: this.get_links_schema(),
       data: joi.alternatives().try(
         joi.array().items(data_payload),
@@ -418,11 +428,6 @@ class Multicolour_Hapi_JSONAPI extends Map {
       ),
       included: joi.array()
     })
-    
-    return joi.alternatives().try(
-      payload_object,
-      this.get_error_schema(),
-    )
   }
 
   /**
@@ -456,9 +461,12 @@ class Multicolour_Hapi_JSONAPI extends Map {
   generate_payload(results, collection, meta) {
     // Check for ambiguity.
     if (!results || !collection) {
-      return this.response({
-        data: [],
-      })
+      throw new ReferenceError(`
+        generate_payload called without results or collection
+
+        results: ${typeof results}
+        collection: ${typeof collection}
+      `)
     }
 
     // Check if it's an error.
@@ -474,7 +482,6 @@ class Multicolour_Hapi_JSONAPI extends Map {
       payload = generator.generate()
     }
     catch (error) {
-      console.error(error)
       return this.response({
         errors: {
           detail: error.message,
