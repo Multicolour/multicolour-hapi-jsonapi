@@ -450,6 +450,7 @@ class Multicolour_Hapi_JSONAPI extends Map {
 
     // Return the schema.
     return waterline_joi(utils.check_and_fix_associations(attributes, "string"))
+      .label(`payload_${collection.adapter.identity}`)
   }
 
   /**
