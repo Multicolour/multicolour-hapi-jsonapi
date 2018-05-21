@@ -1,6 +1,6 @@
 {
   "name": "multicolour-hapi-jsonapi",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "JSON API reply decorator built on Waterline and waterline-jsonapi",
   "main": "index.js",
   "scripts": {
@@ -33,7 +33,6 @@
   "devDependencies": {
     "eslint": "^3.18.0",
     "istanbul": "^0.4.5",
-    "joi": "^10.3.1",
     "multicolour": "^0.6.19",
     "multicolour-seed": "0.0.6",
     "multicolour-server-hapi": "^1.7.6",
@@ -42,7 +41,7 @@
     "tape": "^4.6.3"
   },
   "dependencies": {
-    "joi": "^8.0.3",
+    "joi": "^11.4.0",
     "snyk": "^1.26.0",
     "waterline-joi": "^1.1.1",
     "waterline-jsonapi": "^0.3.21"
