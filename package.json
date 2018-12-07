@@ -41,9 +41,9 @@
     "tape": "^4.6.3"
   },
   "dependencies": {
-    "joi": "^11.4.0",
-    "snyk": "^1.26.0",
-    "waterline-joi": "^1.1.1",
+    "joi": "^8.4.2",
+    "snyk": "^1.49.1",
+    "waterline-joi": "^1.1.2",
     "waterline-jsonapi": "^0.3.21"
   },
   "snyk": true
