@@ -42,7 +42,7 @@
   },
   "dependencies": {
     "joi": "^11.4.0",
-    "snyk": "^1.26.0",
+    "snyk": "^1.319.1",
     "waterline-joi": "^1.1.1",
     "waterline-jsonapi": "^0.3.21"
   },
