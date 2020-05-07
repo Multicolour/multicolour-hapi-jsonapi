@@ -10,5 +10,18 @@ patch:
         patched: '2016-04-05T07:17:30.369Z'
     - hapi > statehood > joi > moment:
         patched: '2016-04-05T07:17:30.369Z'
-version: v1.7.0
+  SNYK-JS-LODASH-567746:
+    - snyk > inquirer > lodash:
+        patched: '2020-05-07T05:20:25.575Z'
+    - snyk > snyk-resolve-deps > lodash:
+        patched: '2020-05-07T05:20:25.575Z'
+    - waterline-jsonapi > async > lodash:
+        patched: '2020-05-07T05:20:25.575Z'
+    - waterline-jsonapi > snyk > inquirer > lodash:
+        patched: '2020-05-07T05:20:25.575Z'
+    - snyk > snyk-go-plugin > graphlib > lodash:
+        patched: '2020-05-07T05:20:25.575Z'
+    - waterline-jsonapi > snyk > snyk-resolve-deps > lodash:
+        patched: '2020-05-07T05:20:25.575Z'
+version: v1.14.1
 ignore: {}
